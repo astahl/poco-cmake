@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 2.8.10.2)
 include(CMakeParseArguments)
-
+#  PocoBundles.cmake 
 # The functions in this file enable the seamless integration of POCO Bundles in a cmake based build context.
 # The following properties are defined, which are similar to the BUNDLE_* Properties provided by cmake for OS X (CFBundle) bundles.
 
@@ -218,19 +218,55 @@ function(POCO_INVOKE_BUNDLE_CREATOR)
 endfunction()
 
 
-function(INSTALL_POCO_BUNDLE target destination)
-	POCO_ASSERT_BUNDLE(${target})
-	poco_get_bundle_file_name(${target} bundle_file_name)
-	foreach(Config ${CMAKE_CONFIGURATION_TYPES})
-		set(MULTI_CONFIG true)
-		string(TOUPPER ${Config} CONFIG)
-		get_target_property(POCO_BUNDLE_OUTPUT_DIRECTORY_${CONFIG} ${target} POCO_BUNDLE_OUTPUT_DIRECTORY_${CONFIG})
-		install(FILES "${POCO_BUNDLE_OUTPUT_DIRECTORY_${CONFIG}}/${bundle_file_name}" DESTINATION "${POCO_BUNDLE_INSTALL_PREFIX}/${destination}" CONFIGURATIONS ${Config})
+# - installs a bundle and included libraries
+# 
+# poco_install_bundle(TARGETS targets... [EXPORT <export-name>]
+#          [[ARCHIVE|LIBRARY|RUNTIME|BUNDLE]
+#           [DESTINATION <dir>]
+#           [CONFIGURATIONS [Debug|Release|...]]
+#           [OPTIONAL]
+#          ] [...])
+function(POCO_INSTALL_BUNDLE)
+	set(options)
+    set(oneValueArgs EXPORT)
+    set(multiValueArgs TARGETS BUNDLE LIBRARY ARCHIVE RUNTIME)
+    set(subOptions OPTIONAL)
+    set(subOneValueArgs DESTINATION)
+    set(subMultiValueArgs CONFIGURATIONS)
+    cmake_parse_arguments(args "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    cmake_parse_arguments(bundle "${subOptions}" "${subOneValueArgs}" "${subMultiValueArgs}" ${args_BUNDLE})
+    cmake_parse_arguments(library "${subOptions}" "${subOneValueArgs}" "${subMultiValueArgs}" ${args_LIBRARY})
+    cmake_parse_arguments(archive "${subOptions}" "${subOneValueArgs}" "${subMultiValueArgs}" ${args_ARCHIVE})
+    cmake_parse_arguments(runtime "${subOptions}" "${subOneValueArgs}" "${subMultiValueArgs}" ${args_RUNTIME})
+    foreach(target ${args_TARGETS})
+		POCO_ASSERT_BUNDLE(${target})
+		poco_get_bundle_file_name(${target} bundle_file_name)
+		foreach(Config ${CMAKE_CONFIGURATION_TYPES})
+			set(MULTI_CONFIG true)
+			string(TOUPPER ${Config} CONFIG)
+			get_target_property(POCO_BUNDLE_OUTPUT_DIRECTORY_${CONFIG} ${target} POCO_BUNDLE_OUTPUT_DIRECTORY_${CONFIG})
+			install(FILES "${POCO_BUNDLE_OUTPUT_DIRECTORY_${CONFIG}}/${bundle_file_name}" DESTINATION "${CMAKE_INSTALL_PREFIX}/${bundle_DESTINATION}" CONFIGURATIONS ${Config})
+		endforeach()
+		if(NOT MULTI_CONFIG)
+			get_target_property(POCO_BUNDLE_OUTPUT_DIRECTORY ${target} POCO_BUNDLE_OUTPUT_DIRECTORY)
+			install(FILES "${POCO_BUNDLE_OUTPUT_DIRECTORY}/${bundle_file_name}" DESTINATION "${CMAKE_INSTALL_PREFIX}/${bundle_DESTINATION}")
+		endif()
+    	get_target_property(LIBRARIES ${target} POCO_BUNDLE_LIBRARIES)
+	
+		foreach(lib ${LIBRARIES})
+			set(install_args TARGETS ${lib} )
+			if(args_LIBRARY)
+				list(APPEND install_args LIBRARY DESTINATION ${library_DESTINATION} CONFIGURATIONS ${library_CONFIGURATIONS})
+			endif()
+			if(args_ARCHIVE)
+	    		list(APPEND install_args ARCHIVE DESTINATION ${archive_DESTINATION} CONFIGURATIONS ${archive_CONFIGURATIONS})
+			endif()
+			if(args_RUNTIME)
+	    		list(APPEND install_args RUNTIME DESTINATION ${runtime_DESTINATION} CONFIGURATIONS ${runtime_CONFIGURATIONS})
+			endif()
+			install(${install_args})
+		endforeach()
 	endforeach()
-	if(NOT MULTI_CONFIG)
-		get_target_property(POCO_BUNDLE_OUTPUT_DIRECTORY ${target} POCO_BUNDLE_OUTPUT_DIRECTORY)
-		install(FILES "${POCO_BUNDLE_OUTPUT_DIRECTORY}/${bundle_file_name}" DESTINATION "${POCO_BUNDLE_INSTALL_PREFIX}/${destination}")
-	endif()
 endfunction()
 
 # - adds a dependency relation between the bundle target and the dependecy.
@@ -709,7 +745,7 @@ function(POCO_ADD_SINGLE_LIBRARY_BUNDLE target bundle_id)
 		INSTALL_NAME_DIR @rpath
 	)
 	set(POCO_BUNDLE_VERSION ${args_VERSION})
-	set(POCO_BUNDLE_ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS})
+	set(POCO_BUNDLE_ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS}) #redundancy
 	set(POCO_BUNDLE_SYMBOLIC_NAME ${bundle_id})
 	set(POCO_BUNDLE_ROOT ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/root)
 	POCO_ADD_BUNDLE(${bundle_id} ACTIVATOR_LIBRARY ${target} ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS})

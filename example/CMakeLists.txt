@@ -5,5 +5,5 @@ project(poco-cmake-examples)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake/)
 list(APPEND CMAKE_INCLUDE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake/)
 
-add_subdirectory(SimpleBundle)
 add_subdirectory(BundleContainerApplication)
+add_subdirectory(SimpleBundle)
