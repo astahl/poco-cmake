@@ -245,11 +245,11 @@ function(POCO_INSTALL_BUNDLE)
 			set(MULTI_CONFIG true)
 			string(TOUPPER ${Config} CONFIG)
 			get_target_property(POCO_BUNDLE_OUTPUT_DIRECTORY_${CONFIG} ${target} POCO_BUNDLE_OUTPUT_DIRECTORY_${CONFIG})
-			install(FILES "${POCO_BUNDLE_OUTPUT_DIRECTORY_${CONFIG}}/${bundle_file_name}" DESTINATION "${CMAKE_INSTALL_PREFIX}/${bundle_DESTINATION}" CONFIGURATIONS ${Config})
+			install(FILES "${POCO_BUNDLE_OUTPUT_DIRECTORY_${CONFIG}}/${bundle_file_name}" DESTINATION ${bundle_DESTINATION} CONFIGURATIONS ${Config})
 		endforeach()
 		if(NOT MULTI_CONFIG)
 			get_target_property(POCO_BUNDLE_OUTPUT_DIRECTORY ${target} POCO_BUNDLE_OUTPUT_DIRECTORY)
-			install(FILES "${POCO_BUNDLE_OUTPUT_DIRECTORY}/${bundle_file_name}" DESTINATION "${CMAKE_INSTALL_PREFIX}/${bundle_DESTINATION}")
+			install(FILES "${POCO_BUNDLE_OUTPUT_DIRECTORY}/${bundle_file_name}" DESTINATION ${bundle_DESTINATION})
 		endif()
     	get_target_property(LIBRARIES ${target} POCO_BUNDLE_LIBRARIES)
 	
@@ -728,15 +728,16 @@ function(POCO_ADD_SINGLE_LIBRARY_BUNDLE target bundle_id)
     set(oneValueArgs 
     	ACTIVATOR_CLASS 
     	VERSION
+    	FOLDER
     )
     cmake_parse_arguments(args "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 	add_library(${target} SHARED ${args_UNPARSED_ARGUMENTS})
-	# check for already valid poco parameters that are mandatory and substitute defaults if necessary.
+
 	set_target_properties(${target}
 		PROPERTIES 
-		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${bundle_id}.dir/root/lib"
-		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${bundle_id}.dir/root/lib"
-		ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${bundle_id}.dir/lib"
+		#LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${bundle_id}.dir/root/lib"
+		#RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${bundle_id}.dir/root/lib"
+		#ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${bundle_id}.dir/lib"
 		RUNTIME_OUTPUT_NAME ${bundle_id}
 		LIBRARY_OUTPUT_NAME ${bundle_id}
 		ARCHIVE_OUTPUT_NAME ${target}
@@ -747,6 +748,14 @@ function(POCO_ADD_SINGLE_LIBRARY_BUNDLE target bundle_id)
 	set(POCO_BUNDLE_VERSION ${args_VERSION})
 	set(POCO_BUNDLE_ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS}) #redundancy
 	set(POCO_BUNDLE_SYMBOLIC_NAME ${bundle_id})
-	set(POCO_BUNDLE_ROOT ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/root)
+	set(POCO_BUNDLE_ROOT ${CMAKE_CURRENT_BINARY_DIR}/${bundle_id}.dir/root)
 	POCO_ADD_BUNDLE(${bundle_id} ACTIVATOR_LIBRARY ${target} ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS})
+	if(args_FOLDER)
+		set_property(GLOBAL PROPERTY USE_FOLDERS true)
+		set_target_properties(${bundle_id} ${target}
+			PROPERTIES 
+			FOLDER ${args_FOLDER}
+		)
+	endif()
+
 endfunction(POCO_ADD_SINGLE_LIBRARY_BUNDLE)

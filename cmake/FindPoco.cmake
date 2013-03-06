@@ -152,9 +152,10 @@ foreach( component ${components} )
 		find_library(
 			Poco_${component}_LIBRARY 
 			NAMES Poco${component} 
-			HINTS 
-				${Poco_LIBRARY_DIR}
-				/usr/local/lib
+			HINTS ${Poco_ROOT_DIR}
+			PATH_SUFFIXES
+				lib
+				bin
 		)
 		if(Poco_${component}_LIBRARY)
 			message(STATUS "Found Poco ${component}: ${Poco_${component}_LIBRARY}")
@@ -170,9 +171,10 @@ foreach( component ${components} )
 		find_library(
 			Poco_${component}_LIBRARY_DEBUG
 			Names Poco${component}d
-			HINTS 
-				${Poco_LIBRARY_DIR}
-				/usr/local/lib
+			HINTS ${Poco_ROOT_DIR}
+			PATH_SUFFIXES
+				lib
+				bin
 		)
 		if(Poco_${component}_LIBRARY_DEBUG)
 			message(STATUS "Found Poco ${component} (debug): ${Poco_${component}_LIBRARY_DEBUG}")
