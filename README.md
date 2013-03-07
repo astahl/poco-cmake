@@ -17,13 +17,16 @@ Put the contents of the cmake dir in your cmake module and include paths.
 
 To build a single library bundle in your CMakeLists.txt file, instead of declaring a library target (add_library), use the following command
 
- poco_add_single_library_bundle(<library_target_name> <bundle_target_name> VERSION <1.0.0> ACTIVATOR_CLASS <activator_class> [FOLDER <ide_folder_name>]
+```cmake
+poco_add_single_library_bundle(<library_target_name> <bundle_target_name> VERSION <1.0.0> ACTIVATOR_CLASS <activator_class> [FOLDER <ide_folder_name>]
 	<src1> [src2...])
+```
 
 This creates two targets, one for the (shared) library and one for the bundle that will contain that library as an "activator". Use the library target for linking to common libraries and the bundle target for bundle related purposes, like dependency declarations, packaging of files, etc.
 
- poco_finalize_bundle(<bundle_target> [COPY_TO <executable_target | directory>])
-
+```cmake
+poco_finalize_bundle(<bundle_target> [COPY_TO <executable_target | directory>])
+```
 Wraps up a bundle and optionally copies the product to a (default) "bundles" subdirectory in the directory of an executable target.
 
 Examples
@@ -37,11 +40,13 @@ Prerequisites:
 
 To build the examples, use cmake on the command line
 
- cd examples
- mkdir out
- cd out
- cmake .. [-G Xcode | -G Ninja | ... ]
- make [xcodebuild | ninja | ... ]
+```bash
+cd examples
+mkdir out
+cd out
+cmake .. [-G Xcode | -G Ninja | ... ]
+make [xcodebuild | ninja | ... ]
+```
 
 or point the cmake gui to the examples folder as source location.
 
@@ -56,9 +61,10 @@ Click configure. If this fails, you might need to expand the "Ungrouped Entries"
 TODOs
 -----
 
-- clean up and document all new target properties.
-- document 
-- optimize target dependencies to avoid unecessary build steps.
+- [ ] clean up and document all new target properties.
+- [ ] document all new functions.
+- [ ] optimize target dependencies to avoid unecessary build steps.
+- [ ] more complex examples with interdependencies and extension points.
 
 
 License
