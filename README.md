@@ -18,8 +18,9 @@ Put the contents of the cmake dir in your cmake module and include paths.
 To build a single library bundle in your CMakeLists.txt file, instead of declaring a library target (add_library), use the following command
 
 ```cmake
-poco_add_single_library_bundle(<library_target_name> <bundle_target_name> VERSION <1.0.0> ACTIVATOR_CLASS <activator_class> [FOLDER <ide_folder_name>]
-	<src1> [src2...])
+poco_add_single_library_bundle(<library_target_name> <bundle_target_name> 
+    VERSION <1.0.0> ACTIVATOR_CLASS <activator_class> [FOLDER <ide_folder_name>]
+    <src1> [src2...])
 ```
 
 This creates two targets, one for the (shared) library and one for the bundle that will contain that library as an "activator". Use the library target for linking to common libraries and the bundle target for bundle related purposes, like dependency declarations, packaging of files, etc.
@@ -28,6 +29,13 @@ This creates two targets, one for the (shared) library and one for the bundle th
 poco_finalize_bundle(<bundle_target> [COPY_TO <executable_target | directory>])
 ```
 Wraps up a bundle and optionally copies the product to a (default) "bundles" subdirectory in the directory of an executable target.
+
+```cmake
+poco_install_bundle(TARGETS <bundle_target>
+	[[BUNDLE | LIBRARY | RUNTIME | ARCHIVE] DESTINATION <dest>] [...]
+)
+```
+This special install command replicates a subset of the standard install command syntax, with one exception: BUNDLE DESTINATION is the directory that the POCO OSP bundle will be installed to. The LIBRARY, RUNTIME and ARCHIVE signatures handle the libraries associated with the bundle and may be omitted if only the bundle is to be used by clients and import libraries will not be distributed with the installation. 
 
 Examples
 --------
