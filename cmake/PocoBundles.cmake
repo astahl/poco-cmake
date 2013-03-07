@@ -519,7 +519,8 @@ set(POCO_BUNDLE_ACTIVATOR_LIBRARY ${BUNDLE_SYMBOLIC_NAME})
 " 
 # Handling activator without renaming.
 get_filename_component(${lib}_EXT \"\\\${${lib}_FILENAME}\" EXT)
-string(REGEX REPLACE \\\${POSTFIX}.dylib|.dll|.so \"\" ${lib}_FILENAME_WE_WP \"\\\${${lib}_FILENAME}\")
+string(REGEX REPLACE d*.dylib|.dll|.so \"\" ${lib}_FILENAME_WE_WP \"\\\${${lib}_FILENAME}\")
+#string(REGEX REPLACE .dylib|.dll|.so \"\" ${lib}_FILENAME_WE_WP \"\\\${${lib}_FILENAME}\")
 set(POCO_BUNDLE_ACTIVATOR_LIBRARY \"\\\${${lib}_FILENAME_WE_WP}\")
 message(STATUS \"Setting ${lib} as activator, \\\${POCO_BUNDLE_ACTIVATOR_LIBRARY}\")
 "
@@ -591,23 +592,23 @@ set(POCO_BUNDLE_SPEC_INPUT \"${POCO_BUNDLE_SPEC_INPUT}\")
 include(\"${POCO_BUNDLE_SPEC_CONFIGURE_FILE}\")
 "
 	)
-	# configure output directory
-	write_config_lines(${target} "
-message(STATUS \"Bundle configuration: \\\${CONFIGURATION}\")
-if(NOT CONFIGURATION OR \"\\\${CONFIGURATION}\" STREQUAL \"Unspecified\")
-  set(output_dir \"\\\${POCO_BUNDLE_OUTPUT_DIRECTORY}\")
-else()
-  string(TOUPPER \"\\\${CONFIGURATION}\" CONFIG)
-  if(POCO_BUNDLE_OUTPUT_DIRECTORY_\\\${CONFIG})
-    set(output_dir \"\\\${POCO_BUNDLE_OUTPUT_DIRECTORY_\\\${CONFIG}}\")
-  else()
-    set(output_dir \"\\\${POCO_BUNDLE_OUTPUT_DIRECTORY}\")
-  endif()
-endif()
-if(NOT output_dir)
-  message(FATAL_ERROR \"No bundle output directory found for configuration \\\${CONFIGURATION}\")
-endif()
-	")
+#	# configure output directory
+#	write_config_lines(${target} "
+#message(STATUS \"Bundle configuration: \\\${CONFIGURATION}\")
+#if(NOT CONFIGURATION OR \"\\\${CONFIGURATION}\" STREQUAL \"Unspecified\")
+#  set(output_dir \"\\\${POCO_BUNDLE_OUTPUT_DIRECTORY}\")
+#else()
+#  string(TOUPPER \"\\\${CONFIGURATION}\" CONFIG)
+#  if(POCO_BUNDLE_OUTPUT_DIRECTORY_\\\${CONFIG})
+#    set(output_dir \"\\\${POCO_BUNDLE_OUTPUT_DIRECTORY_\\\${CONFIG}}\")
+#  else()
+#    set(output_dir \"\\\${POCO_BUNDLE_OUTPUT_DIRECTORY}\")
+#  endif()
+#endif()
+#if(NOT output_dir)
+#  message(FATAL_ERROR \"No bundle output directory found for configuration \\\${CONFIGURATION}\")
+#endif()
+#	")
 
 	# write bundle creator invocation to config file
 	IF_THEN_SET(WIN32 opt "/" "--")
@@ -616,15 +617,23 @@ endif()
 			"${opt}keep-bundle-dir"
 		)
 	endif()
-	write_config_lines(${target} 
-" 
-execute_process(COMMAND \"${Poco_OSP_Bundle_EXECUTABLE}\" ${opt}output-dir=\\\${output_dir}/ ${bundle_args} \"\\\${POCO_BUNDLE_SPEC_OUTPUT}\"WORKING_DIRECTORY \"${BUNDLE_ROOT}\")
-message(STATUS \"Bundle written to \\\${output_dir}\")
-"	
-	)
+#	write_config_lines(${target} 
+#" 
+#execute_process(COMMAND \"${Poco_OSP_Bundle_EXECUTABLE}\" ${opt}output-dir=\\\${output_dir}/ ${bundle_args} \"\\\${POCO_BUNDLE_SPEC_OUTPUT}\"WORKING_DIRECTORY \"${BUNDLE_ROOT}\")
+#message(STATUS \"Bundle written to \\\${output_dir}\")
+#"	
+#	)
 
+	poco_output_dir_generator_expression(${target} DIR_GENERATOR)
+	add_custom_command(TARGET ${target} POST_BUILD
+		COMMAND ${Poco_OSP_Bundle_EXECUTABLE} 
+		ARGS ${opt}output-dir=${DIR_GENERATOR} 
+		${bundle_args} 
+		${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/${target}.bndlspec
+		WORKING_DIRECTORY ${BUNDLE_ROOT}
+	)
 	if(args_COPY_TO)
-		poco_output_dir_generator_expression(${target} DIR_GENERATOR)
+		#poco_output_dir_generator_expression(${target} DIR_GENERATOR)
 		poco_output_name_generator_expression(${target} NAME_GENERATOR)
 			
 		if(TARGET ${args_COPY_TO})
@@ -815,7 +824,7 @@ function(POCO_ADD_SINGLE_LIBRARY_BUNDLE target bundle_id)
 		RUNTIME_OUTPUT_NAME ${bundle_id}
 		LIBRARY_OUTPUT_NAME ${bundle_id}
 		ARCHIVE_OUTPUT_NAME ${target}
-		DEBUG_POSTFIX "d"
+		DEBUG_POSTFIX ""
 		PREFIX ""
 		BUILD_WITH_INSTALL_RPATH true
 		INSTALL_NAME_DIR @rpath
