@@ -2,5 +2,6 @@
 
 class AdditionService : public Poco::OSP::Service
 {
-	int add(int &a, int &b);
+public:
+	int add(int a, int b);
 };
