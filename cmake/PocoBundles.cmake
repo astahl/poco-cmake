@@ -141,6 +141,25 @@ macro(write_config_lines target)
 	endforeach()
 endmacro()
 
+macro(POCO_OUTPUT_DIR_GENERATOR_EXPRESSION target var)
+	# we need to extract the different build configuration dependent 
+	# destinations. This is easiest done by generator expression magic.
+	# what it does is check if each defined configuration is the 
+	# current one during build ($<CONFIG:${Config}>) and on that condition 
+	# selects the respective target property.
+	foreach(Config ${CMAKE_CONFIGURATION_TYPES})
+		string(TOUPPER ${Config} CONFIG)
+		set(DIR_GENERATOR "${DIR_GENERATOR}$<$<CONFIG:${Config}>:$<TARGET_PROPERTY:${target},POCO_BUNDLE_OUTPUT_DIRECTORY_${CONFIG}>>")
+	endforeach()
+	if(NOT DIR_GENERATOR)
+		set(DIR_GENERATOR "$<TARGET_PROPERTY:${target},POCO_BUNDLE_OUTPUT_DIRECTORY>")
+	endif()
+	set(${var} ${DIR_GENERATOR})
+endmacro()
+
+macro(POCO_OUTPUT_NAME_GENERATOR_EXPRESSION target var)
+	set(${var} "$<TARGET_PROPERTY:${target},POCO_BUNDLE_SYMBOLIC_NAME>_$<TARGET_PROPERTY:${target},POCO_BUNDLE_VERSION>.bndl")
+endmacro()
 
 #  poco_get_bundle_file_name
 # composes a bundle's bundle-creator output filename
@@ -387,7 +406,7 @@ endfunction()
 function(POCO_FINALIZE_BUNDLE target)
 	set(options FORCE_RENAME_ACTIVATOR KEEP_BUNDLE_DIR)
 	set(multiValueArgs TARGETS)
-    set(oneValueArgs EXPORT_MAPPING)
+    set(oneValueArgs EXPORT_MAPPING COPY_TO)
     cmake_parse_arguments(args "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
     
     POCO_ASSERT_BUNDLE(${target})
@@ -560,12 +579,23 @@ endif()
 			"${opt}keep-bundle-dir"
 		)
 	endif()
-	write_config_lines(${target} " 
-execute_process(COMMAND \"${Poco_OSP_Bundle_EXECUTABLE}\" ${opt}output-dir=\\\${output_dir}/ ${bundle_args} \"\\\${POCO_BUNDLE_SPEC_OUTPUT}\"
-  WORKING_DIRECTORY \"${BUNDLE_ROOT}\"
-)
+	write_config_lines(${target} 
+" 
+execute_process(COMMAND \"${Poco_OSP_Bundle_EXECUTABLE}\" ${opt}output-dir=\\\${output_dir}/ ${bundle_args} \"\\\${POCO_BUNDLE_SPEC_OUTPUT}\"WORKING_DIRECTORY \"${BUNDLE_ROOT}\")
 message(STATUS \"Bundle written to \\\${output_dir}\")
-	")
+"	
+	)
+
+	if(args_COPY_TO)
+		if(TARGET ${args_COPY_TO})
+			poco_output_dir_generator_expression(${target} DIR_GENERATOR)
+			poco_output_name_generator_expression(${target} NAME_GENERATOR)
+			add_custom_command(TARGET ${target} POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${args_COPY_TO}>/bundles
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DIR_GENERATOR}/${NAME_GENERATOR} $<TARGET_FILE_DIR:${args_COPY_TO}>/bundles/
+			)
+		endif()
+	endif()
 endfunction(POCO_FINALIZE_BUNDLE)
 
 
@@ -590,6 +620,7 @@ endmacro()
 
 function(POCO_BUNDLE_ADD_LIBRARY target library)
 	set_property(TARGET ${target} APPEND PROPERTY POCO_BUNDLE_LIBRARIES ${library})
+	add_dependencies(${target} ${library})
 endfunction()
 
 function(POCO_BUNDLE_SET_ACTIVATOR target activator_library activator_class)

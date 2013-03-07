@@ -11,7 +11,7 @@ find_package(Poco REQUIRED Foundation Util OSP)
 include_directories(${Poco_INCLUDE_DIRS})
 target_link_libraries(SimpleLibrary ${Poco_LIBRARIES})
 
-poco_finalize_bundle(com.example.simple)
+poco_finalize_bundle(com.example.simple COPY_TO bundle-container)
 poco_install_bundle(TARGETS com.example.simple 
 	BUNDLE DESTINATION bin/bundles 
 	LIBRARY DESTINATION lib
