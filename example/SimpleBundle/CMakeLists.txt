@@ -7,6 +7,7 @@ poco_add_single_library_bundle(SimpleLibrary com.example.simple
 	src/SimpleBundleActivator.h src/SimpleBundleActivator.cpp)
 
 find_package(Poco REQUIRED Foundation Util OSP)
+set_source_files_properties(src/SimpleBundleActivator.h PROPERTIES POCO_BUNDLE_PUBLIC_HEADER_LOCATION "simple")
 
 include_directories(${Poco_INCLUDE_DIRS})
 target_link_libraries(SimpleLibrary ${Poco_LIBRARIES})
@@ -17,4 +18,5 @@ poco_install_bundle(TARGETS com.example.simple
 	LIBRARY DESTINATION lib
 	RUNTIME DESTINATION bin
 	ARCHIVE DESTINATION lib
+	PUBLIC_HEADER DESTINATION include
 )

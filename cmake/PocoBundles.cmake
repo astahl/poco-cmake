@@ -60,7 +60,11 @@ define_property(TARGET PROPERTY	POCO_BUNDLE_LIBRARIES
 #
 define_property(SOURCE PROPERTY POCO_BUNDLE_LOCATION
 	BRIEF_DOCS "Place a source file inside a POCO Bundle"
-	FULL_DOCS "Files that have this property set will be copied to the bundle tree during creation. It specifies the path relative to the bundle root where this file will be placed during wrapping. Setting this property to location '.' will copy it to the bundle root (e.g. extensions.xml files).")
+	FULL_DOCS "Files that have this property set will be copied to the bundle tree during creation. It specifies the path relative to the bundle root where this file will be placed during finalization. Setting this property to location '.' will copy it to the bundle root (e.g. extensions.xml files).")
+
+define_property(SOURCE PROPERTY POCO_BUNDLE_PUBLIC_HEADER_LOCATION
+	BRIEF_DOCS "Mark a source file as a public header to a POCO Bundle"
+	FULL_DOCS "Files that have this property set may be installed alongside the bundle. It specifies the path relative to the PUBLIC_HEADER install destination where this file will be placed during install. Setting this property to location '.' will install it to the PUBLIC_HEADER destination directory.")
 
 set(POCO_BUNDLE_PROPERTIES
 	POCO_BUNDLE
@@ -248,7 +252,7 @@ endfunction()
 function(POCO_INSTALL_BUNDLE)
 	set(options)
     set(oneValueArgs EXPORT)
-    set(multiValueArgs TARGETS BUNDLE LIBRARY ARCHIVE RUNTIME)
+    set(multiValueArgs TARGETS BUNDLE LIBRARY ARCHIVE RUNTIME PUBLIC_HEADER)
     set(subOptions OPTIONAL)
     set(subOneValueArgs DESTINATION)
     set(subMultiValueArgs CONFIGURATIONS)
@@ -257,6 +261,7 @@ function(POCO_INSTALL_BUNDLE)
     cmake_parse_arguments(library "${subOptions}" "${subOneValueArgs}" "${subMultiValueArgs}" ${args_LIBRARY})
     cmake_parse_arguments(archive "${subOptions}" "${subOneValueArgs}" "${subMultiValueArgs}" ${args_ARCHIVE})
     cmake_parse_arguments(runtime "${subOptions}" "${subOneValueArgs}" "${subMultiValueArgs}" ${args_RUNTIME})
+    cmake_parse_arguments(public_header "${subOptions}" "${subOneValueArgs}" "${subMultiValueArgs}" ${args_PUBLIC_HEADER})
     foreach(target ${args_TARGETS})
 		POCO_ASSERT_BUNDLE(${target})
 		poco_get_bundle_file_name(${target} bundle_file_name)
@@ -284,6 +289,21 @@ function(POCO_INSTALL_BUNDLE)
 	    		list(APPEND install_args RUNTIME DESTINATION ${runtime_DESTINATION} CONFIGURATIONS ${runtime_CONFIGURATIONS})
 			endif()
 			install(${install_args})
+			get_target_property(FILES ${lib} SOURCES)
+			foreach(file ${FILES})
+				get_source_file_property(public_header_location ${file} POCO_BUNDLE_PUBLIC_HEADER_LOCATION)
+				if(public_header_location)
+					install(FILES ${file} DESTINATION ${public_header_DESTINATION}/${public_header_location} CONFIGURATIONS ${public_header_CONFIGURATIONS})
+				endif()
+			endforeach()
+		endforeach()
+
+		get_target_property(FILES ${target} POCO_BUNDLE_FILES)
+		foreach(file ${FILES})
+			get_source_file_property(public_header_location ${file} POCO_BUNDLE_PUBLIC_HEADER_LOCATION)
+			if(public_header_location)
+				install(FILES ${file} DESTINATION ${public_header_DESTINATION}/${public_header_location} CONFIGURATIONS ${public_header_CONFIGURATIONS})
+			endif()
 		endforeach()
 	endforeach()
 endfunction()
@@ -459,9 +479,26 @@ list(APPEND POCO_BUNDLE_FILES \"\\\${RELATIVE_PATH}\")
 message(STATUS \"Bundle-Config ${target}: Adding ${lib} from: \\\${${lib}_LOCATION}\")
 get_filename_component(${lib}_LOCATION \"\\\${${lib}_LOCATION}\" REALPATH)
 get_filename_component(${lib}_FILENAME \"\\\${${lib}_LOCATION}\" NAME)
+get_filename_component(${lib}_PATH \"\\\${${lib}_LOCATION}\" PATH)
 file(INSTALL \"\\\${${lib}_LOCATION}\" DESTINATION \"${DESTINATION}\")
 "
 		)
+		# handle debug symbols in WIN32
+		if(WIN32)
+		write_config_lines(${target} 
+"
+string(REGEX REPLACE .dll .pdb ${lib}_PDB_FILENAME \"\\\${${lib}_FILENAME}\")
+find_file(${lib}_pdb_file NAMES \"\\\${${lib}_PDB_FILENAME}\" HINTS \"\\\${${lib}_PATH}\")
+message(STATUS \"\\\${${lib}_PDB_FILENAME}: \\\${${lib}_pdb_file}\")
+if(${lib}_pdb_file)
+	message(STATUS \"\\\${${lib}_pdb_file}\")
+	file(INSTALL \"\\\${${lib}_pdb_file}\" DESTINATION \"${DESTINATION}\")
+	file(RELATIVE_PATH ${LIB}_PDB_RELATIVE_PATH \"${BUNDLE_ROOT}\" \"${DESTINATION}/\\\${${lib}_PDB_FILENAME}\")
+	list(APPEND POCO_BUNDLE_CODE \"\\\${${LIB}_PDB_RELATIVE_PATH}\")
+endif()
+"
+		)	
+		endif()
 		# handle lib = activator, first rename then setting 
 		get_target_property(ACTIVATOR_LIBRARY ${target} POCO_BUNDLE_ACTIVATOR_LIBRARY)
 		get_target_property(LIBRARY_OUTPUT_NAME ${lib} LIBRARY_OUTPUT_NAME)
@@ -587,12 +624,18 @@ message(STATUS \"Bundle written to \\\${output_dir}\")
 	)
 
 	if(args_COPY_TO)
+		poco_output_dir_generator_expression(${target} DIR_GENERATOR)
+		poco_output_name_generator_expression(${target} NAME_GENERATOR)
+			
 		if(TARGET ${args_COPY_TO})
-			poco_output_dir_generator_expression(${target} DIR_GENERATOR)
-			poco_output_name_generator_expression(${target} NAME_GENERATOR)
 			add_custom_command(TARGET ${target} POST_BUILD
 				COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${args_COPY_TO}>/bundles
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DIR_GENERATOR}/${NAME_GENERATOR} $<TARGET_FILE_DIR:${args_COPY_TO}>/bundles/
+			)
+		else()
+			add_custom_command(TARGET ${target} POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E make_directory ${args_COPY_TO}
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DIR_GENERATOR}/${NAME_GENERATOR} ${args_COPY_TO}/
 			)
 		endif()
 	endif()
@@ -772,6 +815,7 @@ function(POCO_ADD_SINGLE_LIBRARY_BUNDLE target bundle_id)
 		RUNTIME_OUTPUT_NAME ${bundle_id}
 		LIBRARY_OUTPUT_NAME ${bundle_id}
 		ARCHIVE_OUTPUT_NAME ${target}
+		DEBUG_POSTFIX "d"
 		PREFIX ""
 		BUILD_WITH_INSTALL_RPATH true
 		INSTALL_NAME_DIR @rpath
