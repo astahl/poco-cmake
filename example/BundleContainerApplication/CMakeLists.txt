@@ -27,3 +27,9 @@ if(WIN32)
 endif()
 
 install(TARGETS bundle-container RUNTIME DESTINATION bin)
+
+install(CODE "
+	include(BundleUtilities)
+	find_program(exe NAMES bundle-container bundle-containerd HINTS ${CMAKE_INSTALL_PREFIX}/bin )
+	fixup_bundle(\"\${exe}\" \"\" \"${Poco_RUNTIME_LIBRARY_DIRS}\")
+")

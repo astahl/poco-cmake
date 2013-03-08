@@ -8,7 +8,9 @@ poco_add_single_library_bundle(ConsumerLibrary com.example.consumer
 
 find_package(Poco REQUIRED Foundation Util OSP)
 
-include_directories(${Poco_INCLUDE_DIRS} ../ServiceBundle/src)
+get_directory_property(ServiceBundle_INCLUDE_DIRS DIRECTORY ../ServiceBundle INCLUDE_DIRECTORIES)
+
+include_directories(${Poco_INCLUDE_DIRS} ${ServiceBundle_INCLUDE_DIRS})
 target_link_libraries(ConsumerLibrary ${Poco_LIBRARIES})
 
 poco_target_link_bundle_libraries(ConsumerLibrary com.example.service)
@@ -18,7 +20,7 @@ poco_finalize_bundle(com.example.consumer COPY_TO bundle-container)
 poco_install_bundle(TARGETS com.example.consumer EXPORT example-exports
 	BUNDLE DESTINATION bin/bundles 
 	LIBRARY DESTINATION lib
-	RUNTIME DESTINATION bin
+	RUNTIME DESTINATION lib
 	ARCHIVE DESTINATION lib
 	PUBLIC_HEADER DESTINATION include
 )

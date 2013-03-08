@@ -1,6 +1,7 @@
 #include "Poco/OSP/Service.h"
+#include "ServiceLibrary_export.h"
 
-class AdditionService : public Poco::OSP::Service
+class SERVICELIBRARY_EXPORT AdditionService : public Poco::OSP::Service
 {
 public:
 	int add(int a, int b);

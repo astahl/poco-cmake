@@ -1,4 +1,12 @@
 cmake_minimum_required (VERSION 2.8.10.2)
+if(PocoBundles_INCLUDED)
+	#message(AUTHOR_WARNING "PocoBundles.cmake already included, retuning.")
+	return()
+else()
+	#message(AUTHOR_WARNING "Including PocoBundles.cmake.")
+	set(PocoBundles_INCLUDED true)
+endif()
+
 include(CMakeParseArguments)
 #  PocoBundles.cmake 
 # The functions in this file enable the seamless integration of POCO Bundles in a cmake based build context.
@@ -244,15 +252,17 @@ endfunction()
 # - installs a bundle and included libraries
 # 
 # poco_install_bundle(TARGETS targets... [EXPORT <export-name>]
-#          [[ARCHIVE|LIBRARY|RUNTIME|BUNDLE]
+#          [[ARCHIVE|LIBRARY|RUNTIME|BUNDLE|PUBLIC_HEADER|DEBUG_SYMBOLS]
 #           [DESTINATION <dir>]
 #           [CONFIGURATIONS [Debug|Release|...]]
 #           [OPTIONAL]
 #          ] [...])
+#
+#
 function(POCO_INSTALL_BUNDLE)
 	set(options)
     set(oneValueArgs EXPORT)
-    set(multiValueArgs TARGETS BUNDLE LIBRARY ARCHIVE RUNTIME PUBLIC_HEADER)
+    set(multiValueArgs TARGETS BUNDLE LIBRARY ARCHIVE RUNTIME PUBLIC_HEADER DEBUG_SYMBOLS)
     set(subOptions OPTIONAL)
     set(subOneValueArgs DESTINATION)
     set(subMultiValueArgs CONFIGURATIONS)
@@ -262,6 +272,7 @@ function(POCO_INSTALL_BUNDLE)
     cmake_parse_arguments(archive "${subOptions}" "${subOneValueArgs}" "${subMultiValueArgs}" ${args_ARCHIVE})
     cmake_parse_arguments(runtime "${subOptions}" "${subOneValueArgs}" "${subMultiValueArgs}" ${args_RUNTIME})
     cmake_parse_arguments(public_header "${subOptions}" "${subOneValueArgs}" "${subMultiValueArgs}" ${args_PUBLIC_HEADER})
+    cmake_parse_arguments(debug_symbols "${subOptions}" "${subOneValueArgs}" "${subMultiValueArgs}" ${args_DEBUG_SYMBOLS})
     foreach(target ${args_TARGETS})
 		POCO_ASSERT_BUNDLE(${target})
 		poco_get_bundle_file_name(${target} bundle_file_name)
@@ -292,6 +303,7 @@ function(POCO_INSTALL_BUNDLE)
 	    		list(APPEND install_args RUNTIME DESTINATION ${runtime_DESTINATION} CONFIGURATIONS ${runtime_CONFIGURATIONS})
 			endif()
 			install(${install_args})
+			# public headers
 			get_target_property(FILES ${lib} SOURCES)
 			foreach(file ${FILES})
 				get_source_file_property(public_header_location ${file} POCO_BUNDLE_PUBLIC_HEADER_LOCATION)
@@ -299,6 +311,12 @@ function(POCO_INSTALL_BUNDLE)
 					install(FILES ${file} DESTINATION ${public_header_DESTINATION}/${public_header_location} CONFIGURATIONS ${public_header_CONFIGURATIONS})
 				endif()
 			endforeach()
+			# debug files -- ignores configurations argument
+			if(WIN32 AND args_DEBUG_SYMBOLS)
+				get_target_property(debug_dll_location ${lib} LOCATION_Debug)
+				string(REPLACE ".dll" ".pdb" pdb_location ${debug_dll_location})
+				install(FILES ${pdb_location} DESTINATION ${debug_symbols_DESTINATION} CONFIGURATIONS Debug DEBUG OPTIONAL)
+			endif()
 		endforeach()
 
 		get_target_property(FILES ${target} POCO_BUNDLE_FILES)

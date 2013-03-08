@@ -60,7 +60,6 @@ or point the cmake gui to the examples folder as source location.
 
 ### MS Visual Studio
 
-The examples are not yet up and running on Visual Studio out of the box, but I'm working on it. You can see how far you get by the following method.
 Use the browse source button in CMake to point "Where is the source code" to the examples directory. Set the "Where to build the binaries" line to a directory of your choosing, which will set the project's binary directory, with an out-of-source build highly recommended, i.e. point it to a different directory from where the source lies.
 
 Click configure. If this fails, you might need to expand the "Ungrouped Entries" in the cache variables view and set the Poco_ROOT_DIR variable to the location of your POCO installation, if it's in a non-standard place, then hit configure again. If everything checks out okay (no red messages in the lower log-view), push "Generate", which will create a Visual Studio solution in the binary directory. Open this solution. The project explorer shows the different example targets, as well as the standard cmake targets ALL_BUILD and INSTALL. Build the ALL_BUILD target, set bundle-container as startup project, cross your fingers and hit F5 (Debug).
