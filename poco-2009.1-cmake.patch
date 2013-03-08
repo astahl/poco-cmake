@@ -1,0 +1,560 @@
+diff -rupN poco-2009.1-tudresden/CMakeLists.txt poco-2009.1-tudresden-cmake/CMakeLists.txt
+--- poco-2009.1-tudresden/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ poco-2009.1-tudresden-cmake/CMakeLists.txt	2013-03-08 15:26:14.000000000 +0100
+@@ -0,0 +1,69 @@
++project(POCO)
++cmake_minimum_required(VERSION 2.8)
++
++
++option(POCO_NO_TESTS "Do not build testsuites." OFF)
++option(POCO_NO_SAMPLES "Do not build samples." OFF)
++option(POCO_NO_WSTRING "Compile with -DPOCO_NO_WSTRING. Useful if your C++ compiler does not support std::wstring (such as uClibc-based systems)." OFF)
++option(POCO_NO_FPENVIRONMENT "Compile with -DPOCO_NO_FPENVIRONMENT. Useful if your C++ compiler has incomplete floating-point support (such as uClibc-based systems).")
++option(POCO_POQUITO "Omit a few features for smaller codesize when linking statically for embedded targets.")
++
++option(POCO_ENABLE_MACOSX_FRAMEWORKS "Causes POCO Libraries to be built as OS X Frameworks" OFF)
++
++set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ARCHFLAGS}")
++
++if(POCO_ENABLE_MACOSX_FRAMEWORKS)
++	set(HEADER_INSTALL_DESTINATION Headers)
++	set(CMAKE_INSTALL_NAME_DIR @executable_path/../Frameworks)
++else()
++	set(HEADER_INSTALL_DESTINATION include)
++#	set(CMAKE_INSTALL_NAME_DIR @rpath)
++endif()
++
++if(${POCO_NO_WSTRING})
++	add_definitions(-DPOCO_NO_WSTRING)
++endif()
++if(${POCO_NO_FPENVIRONMENT})
++	add_definitions(-DPOCO_NO_FPENVIRONMENT)
++endif()
++if(${POCO_POQUITO})
++	add_definitions(-DPOCO_NO_FILECHANNEL -DPOCO_NO_SPLITTERCHANNEL -DPOCO_NO_SYSLOGCHANNEL -DDPOCO_UTIL_NO_INIFILECONFIGURATION -DDPOCO_UTIL_NO_XMLCONFIGURATION)
++endif()
++
++set(CMAKE_DEBUG_POSTFIX "d")
++set_directory_properties(PROPERTIES COMPILE_DEFINITIONS_DEBUG "_DEBUG=${DEBUGLEVEL}")
++set_directory_properties(PROPERTIES COMPILE_DEFINITIONS_RELEASE "NDEBUG")
++if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
++	set_directory_properties(PROPERTIES COMPILE_DEFINITIONS "_DEBUG=${DEBUGLEVEL}")
++else()
++	set_directory_properties(PROPERTIES COMPILE_DEFINITIONS "NDEBUG")
++endif()
++
++file(STRINGS libversion LIBVERSION)
++set(POCO_OSP_VERSION 2)
++add_definitions(-DPOCO_NO_TEMPLATE_ICOMPARE) #inhibits build error in NetSSL_OpenSSL referencing String.h in Foundations
++
++file(STRINGS components POCO_COMPONENTS)
++
++# TODO reduce this list by implementing the rest of the poco build in cmake
++list(APPEND OMIT 
++	Data/ODBC
++	Data/SQLite
++	Data/MySQL
++	OSP/BundleAdmin
++	OSP/Core
++	OSP/Data
++	OSP/Data/ODBC
++	OSP/Data/SQLite
++	OSP/Data/MySQL
++	OSP/Net
++	OSP/NetSSL_OpenSSL
++	OSP/SecureWebServer
++	OSP/WebServer
++	OSP/Shell
++	OSP/Shell/Client
++)
++list(REMOVE_ITEM POCO_COMPONENTS ${OMIT})
++foreach(POCO_COMPONENT ${POCO_COMPONENTS})
++	add_subdirectory(${POCO_COMPONENT})
++endforeach()
+\ No newline at end of file
+diff -rupN poco-2009.1-tudresden/CppUnit/CMakeLists.txt poco-2009.1-tudresden-cmake/CppUnit/CMakeLists.txt
+--- poco-2009.1-tudresden/CppUnit/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ poco-2009.1-tudresden-cmake/CppUnit/CMakeLists.txt	2013-02-23 18:15:05.000000000 +0100
+@@ -0,0 +1,23 @@
++include_directories(include src)
++aux_source_directory(src SOURCES)
++file(GLOB_RECURSE INCLUDES include/*.h) 
++
++add_library(CppUnit SHARED ${SOURCES} ${INCLUDES})
++
++set_target_properties(CppUnit
++	PROPERTIES
++	#FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
++	VERSION 1
++)
++
++install(TARGETS CppUnit 
++	FRAMEWORK DESTINATION frameworks
++	RUNTIME DESTINATION bin
++	LIBRARY DESTINATION lib
++)
++
++install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
++
++if(WIN32)
++	add_subdirectory(WinTestRunner)
++endif()
+\ No newline at end of file
+diff -rupN poco-2009.1-tudresden/CppUnit/WinTestRunner/CMakeLists.txt poco-2009.1-tudresden-cmake/CppUnit/WinTestRunner/CMakeLists.txt
+--- poco-2009.1-tudresden/CppUnit/WinTestRunner/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ poco-2009.1-tudresden-cmake/CppUnit/WinTestRunner/CMakeLists.txt	2013-02-23 18:08:05.000000000 +0100
+@@ -0,0 +1,19 @@
++include_directories(include src
++aux_source_directory(src SOURCES)
++file(GLOB_RECURSE INCLUDES include/*.h) 
++
++add_library(WinTestRunner SHARED ${SOURCES} ${INCLUDES} )
++
++set_target_properties(WinTestRunner
++	PROPERTIES
++	#FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
++	VERSION 1
++)
++
++install(TARGETS WinTestRunner 
++	FRAMEWORK DESTINATION frameworks
++	RUNTIME DESTINATION bin
++	LIBRARY DESTINATION lib
++)
++
++install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
+\ No newline at end of file
+diff -rupN poco-2009.1-tudresden/Crypto/CMakeLists.txt poco-2009.1-tudresden-cmake/Crypto/CMakeLists.txt
+--- poco-2009.1-tudresden/Crypto/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ poco-2009.1-tudresden-cmake/Crypto/CMakeLists.txt	2013-02-23 17:13:45.000000000 +0100
+@@ -0,0 +1,24 @@
++include_directories(include src)
++include_directories(${POCO_SOURCE_DIR}/Foundation/include)
++
++aux_source_directory(src SOURCES)
++file(GLOB_RECURSE INCLUDES include/*.h) 
++
++add_library(PocoCrypto SHARED ${SOURCES} ${INCLUDES})
++
++set_target_properties(PocoCrypto PROPERTIES
++	FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
++	VERSION ${LIBVERSION}
++)
++
++find_package(OpenSSL REQUIRED)
++
++target_link_libraries(PocoCrypto PocoFoundation ${OPENSSL_LIBRARIES})
++
++install(TARGETS PocoCrypto
++	FRAMEWORK DESTINATION frameworks
++	LIBRARY DESTINATION lib
++	RUNTIME DESTINATION bin
++)
++
++install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
+\ No newline at end of file
+diff -rupN poco-2009.1-tudresden/Data/CMakeLists.txt poco-2009.1-tudresden-cmake/Data/CMakeLists.txt
+--- poco-2009.1-tudresden/Data/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ poco-2009.1-tudresden-cmake/Data/CMakeLists.txt	2013-02-23 18:11:07.000000000 +0100
+@@ -0,0 +1,22 @@
++include_directories(include src)
++include_directories(${POCO_SOURCE_DIR}/Foundation/include)
++
++aux_source_directory(src SOURCES)
++file(GLOB_RECURSE INCLUDES include/*.h) 
++
++add_library(PocoData SHARED ${SOURCES} ${INCLUDES})
++
++set_target_properties(PocoData PROPERTIES
++	FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
++	VERSION ${LIBVERSION}
++)
++
++target_link_libraries(PocoData PocoFoundation)
++
++install(TARGETS PocoData
++	FRAMEWORK DESTINATION frameworks
++	LIBRARY DESTINATION lib
++	RUNTIME DESTINATION bin
++)
++
++install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
+\ No newline at end of file
+diff -rupN poco-2009.1-tudresden/Foundation/CMakeLists.txt poco-2009.1-tudresden-cmake/Foundation/CMakeLists.txt
+--- poco-2009.1-tudresden/Foundation/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ poco-2009.1-tudresden-cmake/Foundation/CMakeLists.txt	2013-02-23 16:24:01.000000000 +0100
+@@ -0,0 +1,84 @@
++include_directories(include)
++include_directories(src)
++
++file(GLOB_RECURSE INCLUDES include/*.h)
++
++aux_source_directory(src SOURCES)
++
++if(NOT MINGW)
++	list(REMOVE_ITEM SOURCES
++		src/WindowsConsoleChannel.cpp
++		src/EventLogChannel.cpp
++	)
++else()
++	list(REMOVE_ITEM SOURCES
++		src/SysLogChannel.cpp
++	)
++endif()
++if(NOT VMS)
++	list(REMOVE_ITEM SOURCES
++		src/OpcomChannel.cpp
++	)
++endif()
++
++set(ZLIB_SOURCES
++	src/adler32.c
++	src/compress.c
++	src/crc32.c
++	src/deflate.c
++	src/gzio.c
++	src/infback.c
++	src/inffast.c
++	src/inflate.c
++	src/inftrees.c
++	src/trees.c
++	src/zutil.c
++)
++
++set(PCRE_SOURCES
++	src/pcre_chartables.c
++	src/pcre_compile.c
++	src/pcre_exec.c
++	src/pcre_fullinfo.c
++	src/pcre_globals.c
++	src/pcre_maketables.c
++	src/pcre_newline.c
++	src/pcre_ord2utf8.c
++	src/pcre_study.c
++	src/pcre_tables.c
++	src/pcre_try_flipped.c
++	src/pcre_ucd.c
++	src/pcre_valid_utf8.c
++	src/pcre_xclass.c
++)
++
++
++list(REMOVE_ITEM SOURCES
++	${PCRE_SOURCES} ${ZLIB_SOURCES}
++)
++set(platform_regex "(.*)_(UNIX|VMS|WIN32|WIN32U|WINCE|POSIX|C99|DEC|DUMMY|SUN|VX|ANDROID|STD|HPUX)(.*)" )
++foreach(SOURCE_FILE ${SOURCES})
++	if(${SOURCE_FILE} MATCHES ${platform_regex})
++		#message(${SOURCE_FILE})
++		set_source_files_properties(${SOURCE_FILE} PROPERTIES HEADER_FILE_ONLY true)
++	endif()
++endforeach()
++
++add_library(zlib STATIC ${ZLIB_SOURCES})
++add_library(PCRE STATIC ${PCRE_SOURCES})
++add_library(PocoFoundation SHARED ${SOURCES} ${INCLUDES})
++
++set_target_properties(PocoFoundation
++	PROPERTIES
++	FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
++	VERSION ${LIBVERSION}
++)
++
++target_link_libraries(PocoFoundation zlib PCRE)
++
++install(TARGETS PocoFoundation
++	FRAMEWORK DESTINATION frameworks
++	LIBRARY DESTINATION lib
++	RUNTIME DESTINATION bin
++)
++install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
+\ No newline at end of file
+diff -rupN poco-2009.1-tudresden/Net/CMakeLists.txt poco-2009.1-tudresden-cmake/Net/CMakeLists.txt
+--- poco-2009.1-tudresden/Net/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ poco-2009.1-tudresden-cmake/Net/CMakeLists.txt	2013-02-23 17:05:45.000000000 +0100
+@@ -0,0 +1,23 @@
++include_directories(include src)
++include_directories(${POCO_SOURCE_DIR}/Foundation/include)
++
++aux_source_directory(src SOURCES)
++file(GLOB_RECURSE INCLUDES include/*.h) 
++
++add_library(PocoNet SHARED ${SOURCES} ${INCLUDES})
++
++set_target_properties(PocoNet PROPERTIES
++	FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
++	DEFINE_SYMBOL "Net_EXPORTS"
++	VERSION ${LIBVERSION}
++)
++
++target_link_libraries(PocoNet PocoFoundation)
++
++install(TARGETS PocoNet
++	FRAMEWORK DESTINATION frameworks
++	LIBRARY DESTINATION lib
++	RUNTIME DESTINATION bin
++)
++
++install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
+\ No newline at end of file
+diff -rupN poco-2009.1-tudresden/NetSSL_OpenSSL/CMakeLists.txt poco-2009.1-tudresden-cmake/NetSSL_OpenSSL/CMakeLists.txt
+--- poco-2009.1-tudresden/NetSSL_OpenSSL/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ poco-2009.1-tudresden-cmake/NetSSL_OpenSSL/CMakeLists.txt	2013-02-23 17:43:38.000000000 +0100
+@@ -0,0 +1,27 @@
++include_directories(include src)
++include_directories(${POCO_SOURCE_DIR}/Foundation/include)
++include_directories(${POCO_SOURCE_DIR}/Crypto/include)
++include_directories(${POCO_SOURCE_DIR}/Util/include)
++include_directories(${POCO_SOURCE_DIR}/Net/include)
++
++aux_source_directory(src SOURCES)
++file(GLOB_RECURSE INCLUDES include/*.h) 
++
++add_library(PocoNetSSL SHARED ${SOURCES} ${INCLUDES})
++
++set_target_properties(PocoNetSSL PROPERTIES
++	FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
++	VERSION ${LIBVERSION}
++)
++
++find_package(OpenSSL REQUIRED)
++
++target_link_libraries(PocoNetSSL PocoFoundation PocoCrypto PocoUtil PocoNet ${OPENSSL_LIBRARIES})
++
++install(TARGETS PocoNetSSL
++	FRAMEWORK DESTINATION frameworks
++	LIBRARY DESTINATION lib
++	RUNTIME DESTINATION bin
++)
++
++install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
+\ No newline at end of file
+diff -rupN poco-2009.1-tudresden/OSP/BundleCreator/CMakeLists.txt poco-2009.1-tudresden-cmake/OSP/BundleCreator/CMakeLists.txt
+--- poco-2009.1-tudresden/OSP/BundleCreator/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ poco-2009.1-tudresden-cmake/OSP/BundleCreator/CMakeLists.txt	2013-03-04 16:31:36.000000000 +0100
+@@ -0,0 +1,16 @@
++include_directories(src)
++include_directories(${POCO_SOURCE_DIR}/Foundation/include)
++include_directories(${POCO_SOURCE_DIR}/Util/include)
++include_directories(${POCO_SOURCE_DIR}/Zip/include)
++include_directories(${POCO_SOURCE_DIR}/XML/include)
++include_directories(${POCO_SOURCE_DIR}/OSP/include)
++
++aux_source_directory(src SOURCES)
++file(GLOB_RECURSE INCLUDES src/*.h) 
++
++add_executable(bundle ${SOURCES} ${INCLUDES})
++target_link_libraries(bundle PocoOSP PocoFoundation PocoUtil PocoZip PocoXML)
++
++install(TARGETS bundle
++	RUNTIME DESTINATION bin
++)
+\ No newline at end of file
+diff -rupN poco-2009.1-tudresden/OSP/BundleSign/CMakeLists.txt poco-2009.1-tudresden-cmake/OSP/BundleSign/CMakeLists.txt
+--- poco-2009.1-tudresden/OSP/BundleSign/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ poco-2009.1-tudresden-cmake/OSP/BundleSign/CMakeLists.txt	2013-03-04 16:51:57.000000000 +0100
+@@ -0,0 +1,28 @@
++include_directories(include)
++include_directories(src)
++include_directories(${POCO_SOURCE_DIR}/OSP/include)
++include_directories(${POCO_SOURCE_DIR}/Foundation/include)
++include_directories(${POCO_SOURCE_DIR}/Util/include)
++include_directories(${POCO_SOURCE_DIR}/Zip/include)
++include_directories(${POCO_SOURCE_DIR}/XML/include)
++
++aux_source_directory(src SOURCES)
++file(GLOB_RECURSE INCLUDES include/*.h) 
++
++add_library(PocoOSPBundleSign SHARED ${SOURCES} ${INCLUDES})
++
++set_target_properties(PocoOSPBundleSign
++	PROPERTIES
++	FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
++	VERSION ${POCO_OSP_VERSION}
++)
++
++target_link_libraries(PocoOSPBundleSign PocoOSP PocoZip PocoCrypto PocoUtil PocoXML PocoFoundation)
++
++install(TARGETS PocoOSPBundleSign 
++	FRAMEWORK DESTINATION frameworks
++	RUNTIME DESTINATION bin
++	LIBRARY DESTINATION lib
++)
++
++install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
+\ No newline at end of file
+diff -rupN poco-2009.1-tudresden/OSP/CMakeLists.txt poco-2009.1-tudresden-cmake/OSP/CMakeLists.txt
+--- poco-2009.1-tudresden/OSP/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ poco-2009.1-tudresden-cmake/OSP/CMakeLists.txt	2013-02-23 16:26:05.000000000 +0100
+@@ -0,0 +1,27 @@
++include_directories(include)
++include_directories(src)
++include_directories(${POCO_SOURCE_DIR}/Foundation/include)
++include_directories(${POCO_SOURCE_DIR}/Util/include)
++include_directories(${POCO_SOURCE_DIR}/Zip/include)
++include_directories(${POCO_SOURCE_DIR}/XML/include)
++
++aux_source_directory(src SOURCES)
++file(GLOB_RECURSE INCLUDES include/*.h) 
++
++add_library(PocoOSP SHARED ${SOURCES} ${INCLUDES})
++
++set_target_properties(PocoOSP
++	PROPERTIES
++	FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
++	VERSION ${POCO_OSP_VERSION}
++)
++
++target_link_libraries(PocoOSP PocoFoundation PocoUtil PocoZip PocoXML)
++
++install(TARGETS PocoOSP 
++	FRAMEWORK DESTINATION frameworks
++	RUNTIME DESTINATION bin
++	LIBRARY DESTINATION lib
++)
++
++install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
+\ No newline at end of file
+diff -rupN poco-2009.1-tudresden/OSP/Web/CMakeLists.txt poco-2009.1-tudresden-cmake/OSP/Web/CMakeLists.txt
+--- poco-2009.1-tudresden/OSP/Web/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ poco-2009.1-tudresden-cmake/OSP/Web/CMakeLists.txt	2013-03-04 16:51:12.000000000 +0100
+@@ -0,0 +1,44 @@
++include_directories(include)
++include_directories(src)
++include_directories(${POCO_SOURCE_DIR}/OSP/include)
++include_directories(${POCO_SOURCE_DIR}/Foundation/include)
++include_directories(${POCO_SOURCE_DIR}/Util/include)
++include_directories(${POCO_SOURCE_DIR}/Zip/include)
++include_directories(${POCO_SOURCE_DIR}/XML/include)
++
++set(LIB_SOURCES
++	src/MediaTypeMapper.cpp
++	src/WebServerDispatcher.cpp 
++	src/WebServerRequestHandlerFactory.cpp 
++	src/WebServerExtensionPoint.cpp 
++	src/WebSession.cpp 
++	src/WebRequestHandlerFactory.cpp
++    src/WebServerRequestHandler.cpp 
++    src/WebSessionManager.cpp
++)
++
++file(GLOB_RECURSE INCLUDES include/*.h) 
++
++add_library(PocoOSPWeb SHARED ${LIB_SOURCES} ${INCLUDES})
++
++set_target_properties(PocoOSPWeb
++	PROPERTIES
++	FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
++	VERSION ${POCO_OSP_VERSION}
++)
++
++target_link_libraries(PocoOSPWeb PocoFoundation PocoUtil PocoNet PocoXML PocoOSP)
++
++install(TARGETS PocoOSPWeb 
++	FRAMEWORK DESTINATION frameworks
++	RUNTIME DESTINATION bin
++	LIBRARY DESTINATION lib
++)
++
++install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
++
++add_library(osp.web SHARED src/WebBundleActivator.cpp)
++target_link_libraries(osp.web PocoOSPWeb PocoOSP PocoUtil PocoXML PocoFoundation)
++add_custom_command(TARGET osp.web POST_BUILD
++	bundle -o${CMAKE_CURRENT_BINARY_DIRECTORY}/../bundles ${CMAKE_CURRENT_SOURCE_DIRECTORY}/WebBundle.bndlspec
++)
+\ No newline at end of file
+diff -rupN poco-2009.1-tudresden/Util/CMakeLists.txt poco-2009.1-tudresden-cmake/Util/CMakeLists.txt
+--- poco-2009.1-tudresden/Util/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ poco-2009.1-tudresden-cmake/Util/CMakeLists.txt	2013-02-23 16:24:51.000000000 +0100
+@@ -0,0 +1,34 @@
++include_directories(include)
++include_directories(src)
++include_directories(${POCO_SOURCE_DIR}/Foundation/include)
++include_directories(${POCO_SOURCE_DIR}/XML/include)
++
++aux_source_directory(src SOURCES)
++
++if(NOT WIN32)
++	list(REMOVE_ITEM SOURCES
++		src/WinRegistryConfiguration.cpp
++		src/WinRegistryKey.cpp
++		src/WinService.cpp
++	)
++endif()
++
++file(GLOB_RECURSE INCLUDES include/*.h) 
++
++add_library(PocoUtil SHARED ${SOURCES} ${INCLUDES})
++
++set_target_properties(PocoUtil
++	PROPERTIES
++	FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
++	VERSION ${LIBVERSION}
++)
++
++target_link_libraries(PocoUtil PocoFoundation PocoXML)
++
++install(TARGETS PocoUtil
++	FRAMEWORK DESTINATION frameworks
++	LIBRARY DESTINATION lib
++	RUNTIME DESTINATION bin
++)
++
++install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
+diff -rupN poco-2009.1-tudresden/XML/CMakeLists.txt poco-2009.1-tudresden-cmake/XML/CMakeLists.txt
+--- poco-2009.1-tudresden/XML/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ poco-2009.1-tudresden-cmake/XML/CMakeLists.txt	2013-02-23 16:32:21.000000000 +0100
+@@ -0,0 +1,24 @@
++include_directories(include)
++include_directories(src)
++include_directories(${POCO_SOURCE_DIR}/Foundation/include)
++include_directories(${POCO_SOURCE_DIR}/Util/include)
++aux_source_directory(src SOURCES)
++file(GLOB_RECURSE INCLUDES "include" "include/*.h") 
++
++add_definitions(-DXML_NS -DXML_DTD -DHAVE_EXPAT_CONFIG_H)
++add_library(PocoXML SHARED ${SOURCES} ${INCLUDES})
++
++set_target_properties(PocoXML
++	PROPERTIES
++	FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
++	VERSION ${LIBVERSION}
++)
++
++target_link_libraries(PocoXML PocoFoundation)
++
++install(TARGETS PocoXML
++	FRAMEWORK DESTINATION frameworks
++	LIBRARY DESTINATION lib
++	RUNTIME DESTINATION bin
++)
++install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
+\ No newline at end of file
+diff -rupN poco-2009.1-tudresden/Zip/CMakeLists.txt poco-2009.1-tudresden-cmake/Zip/CMakeLists.txt
+--- poco-2009.1-tudresden/Zip/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
++++ poco-2009.1-tudresden-cmake/Zip/CMakeLists.txt	2013-02-23 16:58:51.000000000 +0100
+@@ -0,0 +1,22 @@
++include_directories(include src)
++include_directories(${POCO_SOURCE_DIR}/Foundation/include)
++
++aux_source_directory(src SOURCES)
++file(GLOB_RECURSE INCLUDES include/*.h) 
++
++add_library(PocoZip SHARED ${SOURCES} ${INCLUDES})
++
++set_target_properties(PocoZip PROPERTIES
++	FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
++	VERSION ${LIBVERSION}
++)
++
++target_link_libraries(PocoZip PocoFoundation)
++
++install(TARGETS PocoZip
++	FRAMEWORK DESTINATION frameworks
++	LIBRARY DESTINATION lib
++	RUNTIME DESTINATION bin
++)
++
++install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
+\ No newline at end of file
