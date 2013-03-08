@@ -1,8 +1,10 @@
 #include "ConsumerBundleActivator.h"
 #include "Poco/OSP/ServiceRegistry.h"
 #include "Poco/Logger.h"
-#include "AdditionService.h"
 #include "Poco/NumberFormatter.h"
+
+#include "AdditionService.h"
+
 
 void ConsumerBundleActivator::start(Poco::OSP::BundleContext::Ptr context)
 {

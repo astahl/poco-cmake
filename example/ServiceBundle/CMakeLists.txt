@@ -11,6 +11,7 @@ poco_add_single_library_bundle(ServiceLibrary com.example.service
 
 generate_export_header(ServiceLibrary)
 
+
 set_source_files_properties(src/AdditionService.h PROPERTIES POCO_BUNDLE_PUBLIC_HEADER_LOCATION "example/service")
 
 find_package(Poco REQUIRED Foundation Util OSP)
