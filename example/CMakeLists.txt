@@ -9,3 +9,5 @@ add_subdirectory(BundleContainerApplication)
 add_subdirectory(SimpleBundle)
 add_subdirectory(ServiceBundle)
 add_subdirectory(ConsumerBundle)
+
+install(EXPORT example-exports DESTINATION cmake)

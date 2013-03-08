@@ -11,13 +11,19 @@ find_package(Poco REQUIRED Foundation Util OSP)
 include_directories(${Poco_INCLUDE_DIRS} ../ServiceBundle/src)
 target_link_libraries(ConsumerLibrary ${Poco_LIBRARIES})
 
+poco_target_link_bundle_libraries(ConsumerLibrary com.example.service)
 poco_add_bundle_dependency(com.example.consumer com.example.service)
 
 poco_finalize_bundle(com.example.consumer COPY_TO bundle-container)
-poco_install_bundle(TARGETS com.example.consumer 
+poco_install_bundle(TARGETS com.example.consumer EXPORT example-exports
 	BUNDLE DESTINATION bin/bundles 
 	LIBRARY DESTINATION lib
 	RUNTIME DESTINATION bin
 	ARCHIVE DESTINATION lib
 	PUBLIC_HEADER DESTINATION include
 )
+
+get_directory_property(vars VARIABLES)
+foreach(var ${vars})
+#message(${var})
+endforeach()
