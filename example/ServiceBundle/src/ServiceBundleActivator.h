@@ -14,5 +14,4 @@ class ServiceBundleActivator : public Poco::OSP::BundleActivator
 POCO_BEGIN_MANIFEST(Poco::OSP::BundleActivator)
     POCO_EXPORT_CLASS(ServiceBundleActivator)
 POCO_END_MANIFEST
-
 #endif

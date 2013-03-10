@@ -1,3 +1,6 @@
+#ifndef SimpleBundleActivator_H
+#define SimpleBundleActivator_H
+
 #include "Poco/OSP/BundleActivator.h"
 #include "Poco/OSP/BundleContext.h"
 #include "Poco/ClassLibrary.h"
@@ -11,3 +14,5 @@ class SimpleBundleActivator : public Poco::OSP::BundleActivator
 POCO_BEGIN_MANIFEST(Poco::OSP::BundleActivator)
     POCO_EXPORT_CLASS(SimpleBundleActivator)
 POCO_END_MANIFEST
+
+#endif
