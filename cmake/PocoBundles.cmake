@@ -286,36 +286,56 @@ function(POCO_INSTALL_BUNDLE)
 			get_target_property(POCO_BUNDLE_OUTPUT_DIRECTORY ${target} POCO_BUNDLE_OUTPUT_DIRECTORY)
 			install(FILES "${POCO_BUNDLE_OUTPUT_DIRECTORY}/${bundle_file_name}" DESTINATION ${bundle_DESTINATION})
 		endif()
+
     	get_target_property(LIBRARIES ${target} POCO_BUNDLE_LIBRARIES)
-	
 		foreach(lib ${LIBRARIES})
-			set(install_args TARGETS ${lib} )
-			if(args_EXPORT)
-				list(APPEND install_args EXPORT ${args_EXPORT})
-			endif()
-			if(args_LIBRARY)
-				list(APPEND install_args LIBRARY DESTINATION ${library_DESTINATION} CONFIGURATIONS ${library_CONFIGURATIONS})
-			endif()
-			if(args_ARCHIVE)
-	    		list(APPEND install_args ARCHIVE DESTINATION ${archive_DESTINATION} CONFIGURATIONS ${archive_CONFIGURATIONS})
-			endif()
-			if(args_RUNTIME)
-	    		list(APPEND install_args RUNTIME DESTINATION ${runtime_DESTINATION} CONFIGURATIONS ${runtime_CONFIGURATIONS})
-			endif()
-			install(${install_args})
-			# public headers
-			get_target_property(FILES ${lib} SOURCES)
-			foreach(file ${FILES})
-				get_source_file_property(public_header_location ${file} POCO_BUNDLE_PUBLIC_HEADER_LOCATION)
-				if(public_header_location)
-					install(FILES ${file} DESTINATION ${public_header_DESTINATION}/${public_header_location} CONFIGURATIONS ${public_header_CONFIGURATIONS})
+			get_target_property(imported ${lib} IMPORTED)
+			if(imported)
+				get_target_property(imported_location ${lib} IMPORTED_LOCATION)
+				get_target_property(imported_location_debug ${lib} IMPORTED_LOCATION_DEBUG)
+				if(WIN32)
+					get_target_property(imported_implib ${lib} IMPORTED_IMPLIB)
+					get_target_property(imported_implib_debug ${lib} IMPORTED_IMPLIB_DEBUG)
+					if(imported_location AND args_RUNTIME)
+						install(FILES "${imported_location}" DESTINATION ${runtime_DESTINATION})
+					endif()
+					if(imported_implib AND args_ARCHIVE)
+						install(FILES "${imported_implib}" DESTINATION ${archive_DESTINATION})
+					endif()
+				else()
+					if(imported_location AND args_LIBRARY)
+						install(FILES "${imported_location}" DESTINATION ${library_DESTINATION})
+					endif()
 				endif()
-			endforeach()
-			# debug files -- ignores configurations argument
-			if(WIN32 AND args_DEBUG_SYMBOLS)
-				get_target_property(debug_dll_location ${lib} LOCATION_Debug)
-				string(REPLACE ".dll" ".pdb" pdb_location ${debug_dll_location})
-				install(FILES ${pdb_location} DESTINATION ${debug_symbols_DESTINATION} CONFIGURATIONS Debug DEBUG OPTIONAL)
+			else()
+				set(install_args TARGETS ${lib} )
+				if(args_EXPORT)
+					list(APPEND install_args EXPORT ${args_EXPORT})
+				endif()
+				if(args_LIBRARY)
+					list(APPEND install_args LIBRARY DESTINATION ${library_DESTINATION} CONFIGURATIONS ${library_CONFIGURATIONS})
+				endif()
+				if(args_ARCHIVE)
+		    		list(APPEND install_args ARCHIVE DESTINATION ${archive_DESTINATION} CONFIGURATIONS ${archive_CONFIGURATIONS})
+				endif()
+				if(args_RUNTIME)
+		    		list(APPEND install_args RUNTIME DESTINATION ${runtime_DESTINATION} CONFIGURATIONS ${runtime_CONFIGURATIONS})
+				endif()
+				install(${install_args})
+				# public headers
+				get_target_property(FILES ${lib} SOURCES)
+				foreach(file ${FILES})
+					get_source_file_property(public_header_location ${file} POCO_BUNDLE_PUBLIC_HEADER_LOCATION)
+					if(public_header_location)
+						install(FILES ${file} DESTINATION ${public_header_DESTINATION}/${public_header_location} CONFIGURATIONS ${public_header_CONFIGURATIONS})
+					endif()
+				endforeach()
+				# debug files -- ignores configurations argument
+				if(WIN32 AND args_DEBUG_SYMBOLS)
+					get_target_property(debug_dll_location ${lib} LOCATION_Debug)
+					string(REPLACE ".dll" ".pdb" pdb_location ${debug_dll_location})
+					install(FILES ${pdb_location} DESTINATION ${debug_symbols_DESTINATION} CONFIGURATIONS Debug DEBUG OPTIONAL)
+				endif()
 			endif()
 		endforeach()
 
@@ -768,18 +788,10 @@ function(POCO_ADD_BUNDLE target)
 			if(NOT TARGET ${library})
 				message(FATAL_ERROR "Library argument ${library} to bundle ${target} is not a target.")
 			endif()
-			get_target_property(is_imported ${library} IMPORTED)
-			if(is_imported)
-				list(APPEND config_arguments 
-					"-D${library}_LOCATION:STRING=$<TARGET_FILE:${library}>"
-					"-D${library}_FILENAME:STRING=$<TARGET_FILE_NAME:${library}>"
-				)
-			else()
-				list(APPEND config_arguments 
-					"-D${library}_LOCATION:STRING=$<TARGET_FILE:${library}>"
-					"-D${library}_FILENAME:STRING=$<TARGET_FILE_NAME:${library}>"
-				)
-			endif()
+			list(APPEND config_arguments 
+				"-D${library}_LOCATION:STRING=$<TARGET_FILE:${library}>"
+				"-D${library}_FILENAME:STRING=$<TARGET_FILE_NAME:${library}>"
+			)
 		endforeach()
 	endif()
 
@@ -793,6 +805,7 @@ function(POCO_ADD_BUNDLE target)
 		DEPENDS ${libraries} ${config_file}
 	)
 
+	message(${config_arguments})
 	set_target_properties(${target} PROPERTIES _CONFIG_FILE ${config_file})
 
     if(NOT POCO_BUNDLE_ROOT)
@@ -849,22 +862,19 @@ function(POCO_ADD_SINGLE_LIBRARY_BUNDLE target bundle_id)
 
 	set_target_properties(${target}
 		PROPERTIES 
-		#LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${bundle_id}.dir/root/lib"
-		#RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${bundle_id}.dir/root/lib"
-		#ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${bundle_id}.dir/lib"
 		RUNTIME_OUTPUT_NAME ${bundle_id}
 		LIBRARY_OUTPUT_NAME ${bundle_id}
 		ARCHIVE_OUTPUT_NAME ${target}
 		DEBUG_POSTFIX "d"
 		PREFIX ""
-		BUILD_WITH_INSTALL_RPATH true
+		BUILD_WITH_INSTALL_RPATH true # this ensures an empty rpath in linux
 		INSTALL_NAME_DIR @rpath
 	)
 	set(POCO_BUNDLE_VERSION ${args_VERSION})
-	set(POCO_BUNDLE_ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS}) #redundancy
+	set(POCO_BUNDLE_ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS}) # redundancy?
 	set(POCO_BUNDLE_SYMBOLIC_NAME ${bundle_id})
 	set(POCO_BUNDLE_ROOT ${CMAKE_CURRENT_BINARY_DIR}/${bundle_id}.dir/root)
-	POCO_ADD_BUNDLE(${bundle_id} ACTIVATOR_LIBRARY ${target} ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS})
+	poco_add_bundle(${bundle_id} ACTIVATOR_LIBRARY ${target} ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS})
 	if(args_FOLDER)
 		set_property(GLOBAL PROPERTY USE_FOLDERS true)
 		set_target_properties(${bundle_id} ${target}
