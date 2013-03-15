@@ -146,7 +146,7 @@ macro(POCO_PARSE_BUNDLE_PROPERTIES target var)
     endforeach()
 endmacro()
 
-macro(write_config_lines target)
+macro(WRITE_CONFIG_LINES target)
 	get_target_property(config_file ${target} _CONFIG_FILE)
 	foreach(line ${ARGN})
 		file(APPEND ${config_file} "${line}\n")
@@ -178,12 +178,13 @@ endmacro()
 # usage: 	poco_get_bundle_file_name(<var> TARGET <poco_target>) 
 #			poco_get_bundle_file_name(<var> SYMBOLIC_NAME <name> VERSION <version>)
 # 
-macro(poco_get_bundle_file_name target var_name)
+macro(POCO_GET_BUNDLE_FILE_NAME target var_name)
 	POCO_ASSERT_BUNDLE(${target})
     get_target_property(name ${target} POCO_BUNDLE_SYMBOLIC_NAME)
 	get_target_property(version ${target} POCO_BUNDLE_VERSION)
 	set(${var_name} "${name}_${version}.bndl")
-endmacro(poco_get_bundle_file_name)
+endmacro()
+
 
 function(POCO_INVOKE_BUNDLE_CREATOR)
 	set(options NO_OSARCH NO_OSNAME KEEP_BUNDLE_DIR)
@@ -430,23 +431,28 @@ function(POCO_TARGET_LINK_BUNDLE_LIBRARIES target)
 	endforeach()
 endfunction()
 
-function(EXPORT_POCO_BUNDLE)
+function(POCO_EXPORT_BUNDLE)
+ 	set(options APPEND)
  	set(multiValueArgs TARGETS)
-    set(oneValueArgs FILE)
+    set(oneValueArgs FILE NAMESPACE)
     cmake_parse_arguments(args "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
     if(IS_ABSOLUTE ${args_FILE})
     	set(file ${args_FILE})
     else()
     	set(file ${CMAKE_CURRENT_BINARY_DIR}/${args_FILE})
     endif()
-    file(WRITE ${file} "# Bundle export file for Targets ${args_TARGETS}\n")
+    if(args_APPEND)
+    	file(APPEND ${file} "\n# POCO-OSP-Bundle export for Bundles ${args_TARGETS}\n")
+    else()
+    	file(WRITE ${file} "# POCO-OSP-Bundle export for Bundles ${args_TARGETS}\n")
+    endif()
     # check if all targets are bundles and if all dependend bundle targets are part of the export
 
     foreach(target ${args_TARGETS})
     	POCO_ASSERT_BUNDLE(${target})	
-    	get_target_property(_POCO_BUNDLE_TARGET_DEPENDENCIES ${target} _POCO_BUNDLE_TARGET_DEPENDENCIES)
-    	if(_POCO_BUNDLE_TARGET_DEPENDENCIES)
-    		foreach(dependency ${_POCO_BUNDLE_TARGET_DEPENDENCIES})
+    	get_target_property(dependencies ${target} _POCO_BUNDLE_TARGET_DEPENDENCIES)
+    	if(dependencies)
+    		foreach(dependency ${dependencies})
     			list(FIND args_TARGETS ${dependency} found_var)
     			if(found_var EQUAL -1)
     				message(WARNING "Dependent bundle ${dependency} of ${target} not in export list: ${args_TARGETS}.")
@@ -455,14 +461,38 @@ function(EXPORT_POCO_BUNDLE)
     	endif()
     endforeach()
 
-    # declare targets
+    # create exports for all contained libraries
     foreach(target ${args_TARGETS})
-   		file(APPEND ${file} "add_custom_target(${target})\n")
+    	get_target_property(libraries ${target} POCO_BUNDLE_LIBRARIES)
+    	file(APPEND ${file} "\n#---------------------------------------")
+    	file(APPEND ${file} "\n# POCO-OSP-Bundle export for libraries ${libraries}") 
+    	file(APPEND ${file} "\n#---------------------------------------\n")
+		if(args_NAMESPACE)
+			export(TARGETS ${libraries} NAMESPACE ${args_NAMESPACE} APPEND FILE ${file})
+		else()
+   			export(TARGETS ${libraries} APPEND FILE ${file})
+   		endif()
+   	endforeach()
+
+	file(APPEND ${file} "\n#---------------------------------------")
+  	file(APPEND ${file} "\n# POCO-OSP-Bundle exports ${args_TARGETS}")
+    file(APPEND ${file} "\n#---------------------------------------\n\n")
+	# check if target's already defined
+	foreach(target ${args_TARGETS})
+		file(APPEND ${file} "if(TARGET ${args_NAMESPACE}${target})\n")
+		file(APPEND ${file} " message(FATAL_ERROR \"Import failed, target with name ${args_NAMESPACE}${target} already exists!\")\n")
+		file(APPEND ${file} "endif()\n")
+	endforeach()
+
+    # declare the bundle targets
+    foreach(target ${args_TARGETS})
+   		file(APPEND ${file} "add_custom_target(${args_NAMESPACE}${target})\n")
    	endforeach()
 
    	# set target properties
     foreach(target ${args_TARGETS})
-   		file(APPEND ${file} "set_target_properties(${target} PROPERTIES\n")
+   		file(APPEND ${file} "set_target_properties(${args_NAMESPACE}${target} PROPERTIES\n")
+   		file(APPEND ${file} " POCO_BUNDLE_IMPORTED true\n")
     	poco_parse_bundle_properties(${target} properties)
     	foreach(property ${properties})
     		file(APPEND ${file} " ${property}\n")
@@ -473,152 +503,112 @@ endfunction()
 
 # -- 
 # writes essential information to target config file to finish
-#  up a poco bundle after target configuration
+#  a poco bundle after target configuration
 function(POCO_FINALIZE_BUNDLE target)
-	set(options FORCE_RENAME_ACTIVATOR KEEP_BUNDLE_DIR)
-	set(multiValueArgs TARGETS)
-    set(oneValueArgs EXPORT_MAPPING COPY_TO)
+	set(options KEEP_BUNDLE_DIR NO_DEBUG_SYMBOLS)
+	set(multiValueArgs)
+    set(oneValueArgs COPY_TO)
     cmake_parse_arguments(args "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
     
     POCO_ASSERT_BUNDLE(${target})
 
-	get_target_property(config_file ${target} _CONFIG_FILE)
+    set(spec_output ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/${target}.bndlspec)
+    set(config_file ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_configure.cmake)
+    set(mapping_file ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_mapping.cmake)
 
-	# write properties to config
-	poco_parse_bundle_properties(${target} properties)
-	foreach(property ${POCO_BUNDLE_PROPERTIES})
+    string(TOUPPER ${target} TEMP)
+    string(REPLACE "." "_" bundle_key ${TEMP})
+	
+	find_file(include_file PocoBundlesFunctions.cmake HINTS ${CMAKE_MODULE_PATH})
+	file(WRITE ${config_file} "include(${include_file})\n")
+
+	get_target_property(libraries ${target} POCO_BUNDLE_LIBRARIES)
+	foreach(library ${libraries})
+		if(NOT TARGET ${library})
+			message(FATAL_ERROR "Library argument ${library} to bundle ${target} is not a target.")
+		endif()
+		list(APPEND config_arguments 
+			"-D${library}_FILE=$<TARGET_FILE:${library}>"
+			#"-D${library}_FILE_DIR=$<TARGET_FILE_DIR:${library}>"
+			#"-D${library}_FILE_NAME=$<TARGET_FILE_NAME:${library}>"
+			#"-D${library}_LINKER_FILE=$<TARGET_LINKER_FILE:${library}>"
+		)
+		get_target_property(type ${library} TYPE)
+		message(${library})
+		if(type STREQUAL "SHARED_LIBRARY")
+			#list(APPEND config_arguments 
+			#	"-D${library}_SONAME_FILE=$<TARGET_SONAME_FILE:${library}>"
+			#)
+		endif()
+	endforeach()
+	
+	
+
+	add_custom_command(OUTPUT ${spec_output}
+		COMMAND ${CMAKE_COMMAND} ARGS 
+		-DCONFIGURATION:STRING=$<CONFIGURATION>
+		-DPOCO_BUNDLE_SPEC_OUTPUT:STRING="${spec_output}"
+		${config_arguments}
+		-P ${config_file}
+		DEPENDS ${libraries} ${config_file}
+	)
+
+	# write needed properties to config
+	foreach(property 
+		POCO_BUNDLE_SYMBOLIC_NAME
+		POCO_BUNDLE_NAME
+		POCO_BUNDLE_VERSION
+		POCO_BUNDLE_VENDOR
+		POCO_BUNDLE_COPYRIGHT
+		POCO_BUNDLE_ACTIVATOR_CLASS
+		POCO_BUNDLE_ACTIVATOR_LIBRARY
+		POCO_BUNDLE_LAZY_START
+		POCO_BUNDLE_RUN_LEVEL
+		POCO_BUNDLE_DEPENDENCY
+		POCO_BUNDLE_EXTENDS
+		POCO_BUNDLE_CODE
+		POCO_BUNDLE_FILES
+		POCO_BUNDLE_LIBRARIES
+		_POCO_BUNDLE_TARGET_DEPENDENCIES
+		POCO_BUNDLE_ROOT
+	)
 		get_target_property(prop ${target} ${property})
 		if(prop)
-    		file(APPEND ${config_file} "set(${property} \"${prop}\")\n")
+    		file(APPEND ${config_file} "set(${bundle_key}_${property} \"${prop}\")\n")
     	endif()
     endforeach()
 
-	# get properties needed for config
-	get_target_property(BUNDLE_ROOT ${target} POCO_BUNDLE_ROOT)
-	get_target_property(BUNDLE_SYMBOLIC_NAME ${target} POCO_BUNDLE_SYMBOLIC_NAME)
-
+    file(APPEND ${config_file} "\nset(${bundle_key}_MAPPING_FILE \"${mapping_file}\")\n")
+    set_target_properties(${target} PROPERTIES POCO_BUNDLE_MAPPING_FILE "${mapping_file}")
+    get_target_property(dependencies ${target} _POCO_BUNDLE_TARGET_DEPENDENCIES)
+    if(dependencies)
+    foreach(other_bundle ${dependencies})
+		get_target_property(other_mapping_file ${other_bundle} POCO_BUNDLE_MAPPING_FILE)
+		message(STATUS "${target} Mapping file for ${other_bundle}: ${other_mapping_file}")
+		file(APPEND ${config_file} "if(EXISTS ${other_mapping_file})\n")
+		file(APPEND ${config_file} "  include(${other_mapping_file})\n")
+		file(APPEND ${config_file} "endif()\n")
+	endforeach()
+	endif()
 	# copy additional resources to bundle target
-	get_target_property(SOURCES ${target} SOURCES)
+	get_target_property(files ${target} SOURCES)
 	list(LENGTH SOURCES length)
 	if(${length} GREATER 1)
-		write_config_lines(${target} " "
-			"# copy additional files"
-			"message(STATUS \"Bundle-Config ${target}: copy additional files\")"
-		)
 		foreach(SOURCE_FILE ${SOURCES})
-			get_source_file_property(SOURCE_BUNDLE_LOCATION ${SOURCE_FILE} POCO_BUNDLE_LOCATION)
-			set(DESTINATION ${BUNDLE_ROOT}/${SOURCE_BUNDLE_LOCATION})
-			if(SOURCE_BUNDLE_LOCATION)
+			get_source_file_property(location ${SOURCE_FILE} POCO_BUNDLE_LOCATION)
+			if(location)
 				# the source file was assigned to be copied to a certain destination
-				write_config_lines(${target} "
-#${SOURCE_FILE}
-file(INSTALL \"${SOURCE_FILE}\" DESTINATION \"${DESTINATION}\")
-get_filename_component(FILENAME \"${SOURCE_FILE}\" NAME)
-file(RELATIVE_PATH RELATIVE_PATH \"${BUNDLE_ROOT}\" \"${DESTINATION}/\\\${FILENAME}\")
-list(APPEND POCO_BUNDLE_FILES \"\\\${RELATIVE_PATH}\")
-				")
+				file(APPEND ${config_file} "poco_copy_files_to_bundle(${target} ${location} ${SOURCE_FILE})\n")
 			endif()
 		endforeach()
 	endif()
 
     # copy libraries to bundle tree
-    get_target_property(LIBRARIES ${target} POCO_BUNDLE_LIBRARIES)
-    set(DESTINATION ${BUNDLE_ROOT}/lib)
-    foreach(lib ${LIBRARIES})
-	    write_config_lines(${target} 
-"
-message(STATUS \"Bundle-Config ${target}: Adding ${lib} from: \\\${${lib}_LOCATION}\")
-get_filename_component(${lib}_LOCATION \"\\\${${lib}_LOCATION}\" REALPATH)
-get_filename_component(${lib}_FILENAME \"\\\${${lib}_LOCATION}\" NAME)
-get_filename_component(${lib}_PATH \"\\\${${lib}_LOCATION}\" PATH)
-file(INSTALL \"\\\${${lib}_LOCATION}\" DESTINATION \"${DESTINATION}\")
-"
-		)
-		# handle debug symbols in WIN32
-		if(WIN32)
-		write_config_lines(${target} 
-"
-string(REGEX REPLACE .dll .pdb ${lib}_PDB_FILENAME \"\\\${${lib}_FILENAME}\")
-find_file(${lib}_pdb_file NAMES \"\\\${${lib}_PDB_FILENAME}\" HINTS \"\\\${${lib}_PATH}\")
-message(STATUS \"\\\${${lib}_PDB_FILENAME}: \\\${${lib}_pdb_file}\")
-if(${lib}_pdb_file)
-	message(STATUS \"\\\${${lib}_pdb_file}\")
-	file(INSTALL \"\\\${${lib}_pdb_file}\" DESTINATION \"${DESTINATION}\")
-	file(RELATIVE_PATH ${LIB}_PDB_RELATIVE_PATH \"${BUNDLE_ROOT}\" \"${DESTINATION}/\\\${${lib}_PDB_FILENAME}\")
-	list(APPEND POCO_BUNDLE_CODE \"\\\${${LIB}_PDB_RELATIVE_PATH}\")
-endif()
-"
-		)	
-		endif()
-		# handle lib = activator, first rename then setting 
-		get_target_property(ACTIVATOR_LIBRARY ${target} POCO_BUNDLE_ACTIVATOR_LIBRARY)
-		get_target_property(LIBRARY_OUTPUT_NAME ${lib} LIBRARY_OUTPUT_NAME)
-		if(${ACTIVATOR_LIBRARY} STREQUAL ${lib})
-			if(WIN32 AND ${args_FORCE_RENAME_ACTIVATOR})
-		    	write_config_lines(${target} 
-" 
-# Handling activator with renaming. See FORCE_RENAME_ACTIVATOR option if not desired.
-get_filename_component(${lib}_EXT \"\\\${${lib}_FILENAME}\" EXT)
-message(STATUS \"Setting ${lib} as activator, renaming to ${BUNDLE_SYMBOLIC_NAME}(\\\${POSTFIX}\\\${${lib}_EXT})\")
-file(RENAME \"${DESTINATION}/\\\${${lib}_FILENAME}\" \"${DESTINATION}/${BUNDLE_SYMBOLIC_NAME}\\\${POSTFIX}\\\${${lib}_EXT}\")
-set(${lib}_FILENAME \"${BUNDLE_SYMBOLIC_NAME}\\\${POSTFIX}\\\${${lib}_EXT}\")
-set(POCO_BUNDLE_ACTIVATOR_LIBRARY ${BUNDLE_SYMBOLIC_NAME})
-"
-	    		)
-	    	else()
-	    		write_config_lines(${target} 
-" 
-# Handling activator without renaming.
-get_filename_component(${lib}_EXT \"\\\${${lib}_FILENAME}\" EXT)
-string(REGEX REPLACE d*.dylib|d*.dll|d*.so \"\" ${lib}_FILENAME_WE_WP \"\\\${${lib}_FILENAME}\")
-#string(REGEX REPLACE .dylib|.dll|.so \"\" ${lib}_FILENAME_WE_WP \"\\\${${lib}_FILENAME}\")
-set(POCO_BUNDLE_ACTIVATOR_LIBRARY \"\\\${${lib}_FILENAME_WE_WP}\")
-message(STATUS \"Setting ${lib} as activator, \\\${POCO_BUNDLE_ACTIVATOR_LIBRARY}\")
-"
-				)
-	    	endif()
-		endif()
-		write_config_lines(${target} " 
-file(RELATIVE_PATH ${LIB}_RELATIVE_PATH \"${BUNDLE_ROOT}\" \"${DESTINATION}/\\\${${lib}_FILENAME}\")
-list(APPEND POCO_BUNDLE_CODE \"\\\${${LIB}_RELATIVE_PATH}\")
-		")
-	endforeach()
+    file(APPEND ${config_file} "poco_fixup_libraries(${target})\n")
 
-    # OS X: make the libraries portable by manipulating the install name
-    if(APPLE)
-    	find_program(INSTALL_NAME_TOOL NAME install_name_tool HINTS /usr/bin)
-    	if(INSTALL_NAME_TOOL)
-		    foreach(lib ${LIBRARIES})
-				write_config_lines(${target} " "
-		      		"message(STATUS \"Changing install names for \\\${${lib}_FILENAME}:\")"
-			    	"execute_process(COMMAND \"${INSTALL_NAME_TOOL}\""
-			    )
-			    foreach(dependent_lib ${LIBRARIES})
-			    	write_config_lines(${target} 
-			      		"  -change \"\\\${${dependent_lib}_LOCATION}\" \"\\\${${dependent_lib}_FILENAME}\""
-			     	)
-			    endforeach()
-		      	write_config_lines(${target} 
-			      	"  -id \"\\\${${lib}_FILENAME}\""
-			      	"  -add_rpath @rpath"
-		      		"  \"${DESTINATION}/\\\${${lib}_FILENAME}\""
-		      		")"
-		      		"message(STATUS \" id:\\\${${lib}_FILENAME}\")"
-				)
-				foreach(dependent_lib ${LIBRARIES})
-			    	write_config_lines(${target} 
-			      		"message(STATUS \" \\\${${dependent_lib}_LOCATION} -> \\\${${dependent_lib}_FILENAME}\")"
-			     	)
-			    endforeach()
-				if(args_EXPORT_MAPPING)
-					write_config_lines(${target} " "
-				      	"file(APPEND \"${CMAKE_CURRENT_BINARY_DIR}/${args_EXPORT_MAPPING}\" \"set(${lib} \"${DESTINATION}/\\\${${lib}_filename}\"\n\")"
-					)
-				endif()
-			endforeach()
-		else()
-			message(FATAL_ERROR "install_name_tool not found")
-		endif()
+	get_target_property(activator ${target} POCO_BUNDLE_ACTIVATOR_LIBRARY)
+	if(activator)
+		file(APPEND ${config_file} "poco_set_activator(${target} ${activator})\n")
 	endif()
 
 	# see if a custom specification is defined
@@ -629,73 +619,54 @@ list(APPEND POCO_BUNDLE_CODE \"\\\${${LIB}_RELATIVE_PATH}\")
 	if(POCO_BUNDLE_SPEC)
 		message(STATUS "Found custom Bundle template specification: ${POCO_BUNDLE_SPEC}")
 		# configure the bundle specification configure file
-		set(POCO_BUNDLE_SPEC_INPUT ${POCO_BUNDLE_SPEC})
+		set(spec_input ${POCO_BUNDLE_SPEC})
 	else()
 		# there was no custom bundle specification defined, 
 		# we need to configure the default file according to POCO_BUNDLE_XX target properties
-		find_file(POCO_BUNDLE_SPEC_CONFIGURE_FILE "PocoBundleSpecConfigure.cmake" HINTS ${CMAKE_MODULE_PATH})
-		find_file(POCO_BUNDLE_SPEC_INPUT "PocoBundleSpec.bndlspec.in" HINTS ${CMAKE_MODULE_PATH})
+		find_file(spec_input "PocoBundleSpec.bndlspec.in" HINTS ${CMAKE_MODULE_PATH})
 	endif()
 	
-	write_config_lines(${target} 
-"
-set(POCO_BUNDLE_SPEC_INPUT \"${POCO_BUNDLE_SPEC_INPUT}\")
-include(\"${POCO_BUNDLE_SPEC_CONFIGURE_FILE}\")
-"
-	)
-#	# configure output directory
-#	write_config_lines(${target} "
-#message(STATUS \"Bundle configuration: \\\${CONFIGURATION}\")
-#if(NOT CONFIGURATION OR \"\\\${CONFIGURATION}\" STREQUAL \"Unspecified\")
-#  set(output_dir \"\\\${POCO_BUNDLE_OUTPUT_DIRECTORY}\")
-#else()
-#  string(TOUPPER \"\\\${CONFIGURATION}\" CONFIG)
-#  if(POCO_BUNDLE_OUTPUT_DIRECTORY_\\\${CONFIG})
-#    set(output_dir \"\\\${POCO_BUNDLE_OUTPUT_DIRECTORY_\\\${CONFIG}}\")
-#  else()
-#    set(output_dir \"\\\${POCO_BUNDLE_OUTPUT_DIRECTORY}\")
-#  endif()
-#endif()
-#if(NOT output_dir)
-#  message(FATAL_ERROR \"No bundle output directory found for configuration \\\${CONFIGURATION}\")
-#endif()
-#	")
+	file(APPEND ${config_file} "poco_configure_bundle_spec(${target} ${spec_input} ${spec_output})\n")
 
-	# write bundle creator invocation to config file
 	IF_THEN_SET(WIN32 opt "/" "--")
 	if(args_KEEP_BUNDLE_DIR)
 		set(bundle_args 
 			"${opt}keep-bundle-dir"
 		)
 	endif()
-#	write_config_lines(${target} 
-#" 
-#execute_process(COMMAND \"${Poco_OSP_Bundle_EXECUTABLE}\" ${opt}output-dir=\\\${output_dir}/ ${bundle_args} \"\\\${POCO_BUNDLE_SPEC_OUTPUT}\"WORKING_DIRECTORY \"${BUNDLE_ROOT}\")
-#message(STATUS \"Bundle written to \\\${output_dir}\")
-#"	
-#	)
+	
+	get_target_property(bundle_root ${target} POCO_BUNDLE_ROOT)
 
 	poco_output_dir_generator_expression(${target} DIR_GENERATOR)
-	add_custom_command(TARGET ${target} POST_BUILD
+	add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
 		COMMAND ${Poco_OSP_Bundle_EXECUTABLE} 
-		ARGS ${opt}output-dir=${DIR_GENERATOR} 
-		${bundle_args} 
-		${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/${target}.bndlspec
-		WORKING_DIRECTORY ${BUNDLE_ROOT}
+		ARGS 
+			${opt}output-dir=${DIR_GENERATOR} 
+			${bundle_args} 
+			${spec_output}
+		COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
+		DEPENDS ${spec_output}
+		WORKING_DIRECTORY ${bundle_root}
+		COMMENT "Building Bundle ${target} in root ${bundle_root}"
 	)
 	if(args_COPY_TO)
-		#poco_output_dir_generator_expression(${target} DIR_GENERATOR)
 		poco_output_name_generator_expression(${target} NAME_GENERATOR)
 			
 		if(TARGET ${args_COPY_TO})
-			add_custom_command(TARGET ${target} POST_BUILD
+			add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_copy.txt
 				COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${args_COPY_TO}>/bundles
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DIR_GENERATOR}/${NAME_GENERATOR} $<TARGET_FILE_DIR:${args_COPY_TO}>/bundles/
+				COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
+				COMMENT "Copying Bundle ${target} to ${args_COPY_TO}'s bundle directory."
+				DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
 			)
 		else()
-			add_custom_command(TARGET ${target} POST_BUILD
+			add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_copy.txt
 				COMMAND ${CMAKE_COMMAND} -E make_directory ${args_COPY_TO}
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DIR_GENERATOR}/${NAME_GENERATOR} ${args_COPY_TO}/
+				COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
+				COMMENT "Copying Bundle ${target} to directory ${args_COPY_TO}"
+				DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
 			)
 		endif()
 	endif()
@@ -721,9 +692,9 @@ macro(POCO_MAKE_BUNDLE_TARGET target)
 	endforeach()
 endmacro()
 
-function(POCO_BUNDLE_ADD_LIBRARY target library)
-	set_property(TARGET ${target} APPEND PROPERTY POCO_BUNDLE_LIBRARIES ${library})
-	add_dependencies(${target} ${library})
+function(POCO_BUNDLE_ADD_LIBRARIES target)
+	set_property(TARGET ${target} APPEND PROPERTY POCO_BUNDLE_LIBRARIES ${ARGN})
+	add_dependencies(${target} ${ARGN})
 endfunction()
 
 function(POCO_BUNDLE_SET_ACTIVATOR target activator_library activator_class)
@@ -745,13 +716,6 @@ function(POCO_ADD_BUNDLE target)
     	VERSION VENDOR SYMBOLIC_NAME NAME
     )
     cmake_parse_arguments(args "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-    
-	set(POCO_BUNDLE_SPEC_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/${target}.bndlspec)
-    set(config_file ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_configure.cmake)
-
-    if(EXISTS "${config_file}")
-		file(REMOVE ${config_file})
-	endif()
 
     # perform function arguments sanity checks
 	if(args_LIBRARIES AND NOT args_ACTIVATOR_LIBRARY AND NOT args_NO_ACTIVATOR)	
@@ -773,40 +737,14 @@ function(POCO_ADD_BUNDLE target)
 	# Vendor
 	IF_THEN_SET(args_VENDOR POCO_BUNDLE_VENDOR "${args_VENDOR}" "${POCO_BUNDLE_VENDOR}")
 	IF_THEN_SET(POCO_BUNDLE_VENDOR POCO_BUNDLE_VENDOR "${POCO_BUNDLE_VENDOR}" "no vendor information available")
-	
 	if(NOT TARGET ${target})
 		add_custom_target(${target} ALL
-			DEPENDS ${POCO_BUNDLE_SPEC_OUTPUT} ${args_FILES}
+			DEPENDS 
+				${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
+				${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_copy.txt
 			SOURCES ${args_FILES}
 		)
 	endif()
-	
-	if(args_LIBRARIES OR args_ACTIVATOR_LIBRARY)
-		list(APPEND libraries ${args_LIBRARIES} ${args_ACTIVATOR_LIBRARY})
-		list(REMOVE_DUPLICATES libraries)
-		foreach(library ${libraries})
-			if(NOT TARGET ${library})
-				message(FATAL_ERROR "Library argument ${library} to bundle ${target} is not a target.")
-			endif()
-			list(APPEND config_arguments 
-				"-D${library}_LOCATION:STRING=$<TARGET_FILE:${library}>"
-				"-D${library}_FILENAME:STRING=$<TARGET_FILE_NAME:${library}>"
-			)
-		endforeach()
-	endif()
-
-	add_custom_command(OUTPUT ${POCO_BUNDLE_SPEC_OUTPUT}
-		COMMAND ${CMAKE_COMMAND} ARGS 
-		-DCONFIGURATION:STRING=$<CONFIGURATION>
-		-DPOSTFIX:STRING="$<$<CONFIG:Debug>:d>"
-		-DPOCO_BUNDLE_SPEC_OUTPUT:STRING="${POCO_BUNDLE_SPEC_OUTPUT}"
-		${config_arguments}
-		-P ${config_file}
-		DEPENDS ${libraries} ${config_file}
-	)
-
-	message(${config_arguments})
-	set_target_properties(${target} PROPERTIES _CONFIG_FILE ${config_file})
 
     if(NOT POCO_BUNDLE_ROOT)
 		set(POCO_BUNDLE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/root")
@@ -830,6 +768,10 @@ function(POCO_ADD_BUNDLE target)
 		endif()
 	endforeach()
 
+	if(args_LIBRARIES)
+		poco_bundle_add_libraries(${target} ${args_LIBRARIES})
+	endif()
+
 	if(args_NO_ACTIVATOR)
 		set_property(TARGET ${target} PROPERTY POCO_BUNDLE_ACTIVATOR_LIBRARY)
 		set_property(TARGET ${target} PROPERTY POCO_BUNDLE_ACTIVATOR_CLASS)
@@ -838,27 +780,23 @@ function(POCO_ADD_BUNDLE target)
 			POCO_BUNDLE_ACTIVATOR_LIBRARY ${args_ACTIVATOR_LIBRARY}
 			POCO_BUNDLE_ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS}
 		)
+		poco_bundle_add_libraries(${target} ${args_ACTIVATOR_LIBRARY})
 	endif()
-
 	poco_make_bundle_target(${target})
-	
-	foreach(lib ${libraries})
-		poco_bundle_add_library(${target} ${lib})
-	endforeach()
 endfunction()
 
 
 # -- Add a POCO Bundle to the project using the specified source files.
 function(POCO_ADD_SINGLE_LIBRARY_BUNDLE target bundle_id)
 	set(options)
-	set(multiValueArgs SOURCES)
+	set(multiValueArgs BUNDLE_FILES LIBRARY_SOURCES)
     set(oneValueArgs 
     	ACTIVATOR_CLASS 
     	VERSION
     	FOLDER
     )
     cmake_parse_arguments(args "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-	add_library(${target} SHARED ${args_UNPARSED_ARGUMENTS})
+	add_library(${target} SHARED ${args_LIBRARY_SOURCES})
 
 	set_target_properties(${target}
 		PROPERTIES 
@@ -868,13 +806,13 @@ function(POCO_ADD_SINGLE_LIBRARY_BUNDLE target bundle_id)
 		DEBUG_POSTFIX "d"
 		PREFIX ""
 		BUILD_WITH_INSTALL_RPATH true # this ensures an empty rpath in linux
-		INSTALL_NAME_DIR @rpath
+		#INSTALL_NAME_DIR "@rpath"
 	)
 	set(POCO_BUNDLE_VERSION ${args_VERSION})
 	set(POCO_BUNDLE_ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS}) # redundancy?
 	set(POCO_BUNDLE_SYMBOLIC_NAME ${bundle_id})
 	set(POCO_BUNDLE_ROOT ${CMAKE_CURRENT_BINARY_DIR}/${bundle_id}.dir/root)
-	poco_add_bundle(${bundle_id} ACTIVATOR_LIBRARY ${target} ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS})
+	poco_add_bundle(${bundle_id} ACTIVATOR_LIBRARY ${target} ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS} FILES ${args_BUNDLE_FILES})
 	if(args_FOLDER)
 		set_property(GLOBAL PROPERTY USE_FOLDERS true)
 		set_target_properties(${bundle_id} ${target}
@@ -882,5 +820,4 @@ function(POCO_ADD_SINGLE_LIBRARY_BUNDLE target bundle_id)
 			FOLDER ${args_FOLDER}
 		)
 	endif()
-
 endfunction(POCO_ADD_SINGLE_LIBRARY_BUNDLE)

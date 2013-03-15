@@ -21,7 +21,7 @@ set(SOURCES
 
 poco_add_single_library_bundle(ServiceLibrary com.example.service
 	VERSION 1.0.0 ACTIVATOR_CLASS ServiceBundleActivator FOLDER Service
-	${SOURCES}
+	LIBRARY_SOURCES ${SOURCES}
 )
 
 set_target_properties(com.example.service PROPERTIES POCO_BUNDLE_RUN_LEVEL 100)
@@ -39,6 +39,7 @@ include_directories(${Poco_INCLUDE_DIRS} ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_
 target_link_libraries(ServiceLibrary ${Poco_LIBRARIES})
 
 poco_finalize_bundle(com.example.service COPY_TO bundle-container)
+poco_export_bundle(TARGETS com.example.service FILE service-bundle.cmake)
 poco_install_bundle(TARGETS com.example.service EXPORT example-exports
 	BUNDLE DESTINATION bin/bundles 
 	LIBRARY DESTINATION lib

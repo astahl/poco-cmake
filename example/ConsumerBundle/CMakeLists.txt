@@ -4,7 +4,7 @@ include(PocoBundles)
 
 poco_add_single_library_bundle(ConsumerLibrary com.example.consumer 
 	VERSION 1.0.0 ACTIVATOR_CLASS ConsumerBundleActivator FOLDER Consumer
-	src/ConsumerBundleActivator.h src/ConsumerBundleActivator.cpp)
+	LIBRARY_SOURCES src/ConsumerBundleActivator.h src/ConsumerBundleActivator.cpp)
 
 find_package(Poco REQUIRED Foundation Util OSP)
 

@@ -3,8 +3,13 @@ project(SimpleBundle)
 include(PocoBundles)
 
 poco_add_single_library_bundle(SimpleLibrary com.example.simple 
-	VERSION 1.0.0 ACTIVATOR_CLASS SimpleBundleActivator FOLDER Simple
-	src/SimpleBundleActivator.h src/SimpleBundleActivator.cpp)
+	VERSION 1.0.0 
+	ACTIVATOR_CLASS SimpleBundleActivator 
+	FOLDER Simple 
+	BUNDLE_FILES bundle/payload.txt
+	LIBRARY_SOURCES src/SimpleBundleActivator.h src/SimpleBundleActivator.cpp)
+
+set_source_files_properties(bundle/payload.txt PROPERTIES POCO_BUNDLE_LOCATION ".")
 
 find_package(Poco REQUIRED Foundation Util OSP)
 
