@@ -422,9 +422,19 @@ endfunction()
 function(POCO_TARGET_LINK_BUNDLE_LIBRARIES target)
 	foreach(bundle ${ARGN})
 		poco_assert_bundle(${bundle})
-		get_target_property(LIBRARIES ${bundle} POCO_BUNDLE_LIBRARIES)
-		if(LIBRARIES)
-	    	target_link_libraries(${target} ${LIBRARIES})
+		get_target_property(libs ${bundle} POCO_BUNDLE_LIBRARIES)
+		if(libs)
+			foreach(lib ${libs})
+				if(TARGET ${lib})
+					get_target_property(type ${lib} TYPE)
+					if(type STREQUAL "MODULE_LIBRARY")
+						message(STATUS "Cannot link ${target} ${lib} ${type} -- skipping.")
+				   	else()
+						message(STATUS "Linking ${target} ${lib} ${type}")
+				   		target_link_libraries(${target} LINK_PUBLIC ${lib})
+				   	endif()
+		    	endif()
+	    	endforeach()
 	    else()
 	    	message("${bundle} has no libraries to link against.")
 	    endif()
@@ -534,7 +544,6 @@ function(POCO_FINALIZE_BUNDLE target)
 			#"-D${library}_LINKER_FILE=$<TARGET_LINKER_FILE:${library}>"
 		)
 		get_target_property(type ${library} TYPE)
-		message(${library})
 		if(type STREQUAL "SHARED_LIBRARY")
 			#list(APPEND config_arguments 
 			#	"-D${library}_SONAME_FILE=$<TARGET_SONAME_FILE:${library}>"
@@ -788,7 +797,7 @@ endfunction()
 
 # -- Add a POCO Bundle to the project using the specified source files.
 function(POCO_ADD_SINGLE_LIBRARY_BUNDLE target bundle_id)
-	set(options)
+	set(options MODULE)
 	set(multiValueArgs BUNDLE_FILES LIBRARY_SOURCES)
     set(oneValueArgs 
     	ACTIVATOR_CLASS 
@@ -796,7 +805,11 @@ function(POCO_ADD_SINGLE_LIBRARY_BUNDLE target bundle_id)
     	FOLDER
     )
     cmake_parse_arguments(args "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-	add_library(${target} SHARED ${args_LIBRARY_SOURCES})
+    if(${args_MODULE})
+		add_library(${target} MODULE ${args_LIBRARY_SOURCES})
+	else()
+		add_library(${target} SHARED ${args_LIBRARY_SOURCES})
+	endif()
 
 	set_target_properties(${target}
 		PROPERTIES 
@@ -808,8 +821,9 @@ function(POCO_ADD_SINGLE_LIBRARY_BUNDLE target bundle_id)
 		BUILD_WITH_INSTALL_RPATH true # this ensures an empty rpath in linux
 		#INSTALL_NAME_DIR "@rpath"
 	)
-	set(POCO_BUNDLE_VERSION ${args_VERSION})
-	set(POCO_BUNDLE_ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS}) # redundancy?
+	if(${args_VERSION})
+		set(POCO_BUNDLE_VERSION ${args_VERSION})
+	endif()
 	set(POCO_BUNDLE_SYMBOLIC_NAME ${bundle_id})
 	set(POCO_BUNDLE_ROOT ${CMAKE_CURRENT_BINARY_DIR}/${bundle_id}.dir/root)
 	poco_add_bundle(${bundle_id} ACTIVATOR_LIBRARY ${target} ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS} FILES ${args_BUNDLE_FILES})
