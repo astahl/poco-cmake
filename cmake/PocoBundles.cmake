@@ -532,6 +532,7 @@ function(POCO_FINALIZE_BUNDLE target)
 	find_file(include_file PocoBundlesFunctions.cmake HINTS ${CMAKE_MODULE_PATH})
 	file(WRITE ${config_file} "include(${include_file})\n")
 
+	get_target_property(bundle_root ${target} POCO_BUNDLE_ROOT)
 	get_target_property(libraries ${target} POCO_BUNDLE_LIBRARIES)
 	foreach(library ${libraries})
 		if(NOT TARGET ${library})
@@ -551,9 +552,7 @@ function(POCO_FINALIZE_BUNDLE target)
 		endif()
 	endforeach()
 	
-	
-
-	add_custom_command(OUTPUT ${spec_output}
+	add_custom_command(OUTPUT ${spec_output} ${mapping_file} ${bundle_root}
 		COMMAND ${CMAKE_COMMAND} ARGS 
 		-DCONFIGURATION:STRING=$<CONFIGURATION>
 		-DPOCO_BUNDLE_SPEC_OUTPUT:STRING="${spec_output}"
@@ -601,17 +600,18 @@ function(POCO_FINALIZE_BUNDLE target)
 	endif()
 	# copy additional resources to bundle target
 	get_target_property(files ${target} SOURCES)
-	list(LENGTH SOURCES length)
-	if(${length} GREATER 1)
-		foreach(SOURCE_FILE ${SOURCES})
-			get_source_file_property(location ${SOURCE_FILE} POCO_BUNDLE_LOCATION)
-			if(location)
-				# the source file was assigned to be copied to a certain destination
-				file(APPEND ${config_file} "poco_copy_files_to_bundle(${target} ${location} ${SOURCE_FILE})\n")
-			endif()
-		endforeach()
-	endif()
 
+	foreach(file ${files})
+		get_property(has_location SOURCE ${file} PROPERTY POCO_BUNDLE_LOCATION SET)
+			
+		if(${has_location})
+			get_source_file_property(location ${file} POCO_BUNDLE_LOCATION)
+			# the source file was assigned to be copied to a certain destination
+			message("${file} ${location}")
+			file(APPEND ${config_file} "poco_copy_files_to_bundle(${target} \"${file}\" \"${location}\")\n")
+		endif()
+	endforeach()
+	
     # copy libraries to bundle tree
     file(APPEND ${config_file} "poco_fixup_libraries(${target})\n")
 
@@ -644,7 +644,6 @@ function(POCO_FINALIZE_BUNDLE target)
 		)
 	endif()
 	
-	get_target_property(bundle_root ${target} POCO_BUNDLE_ROOT)
 
 	poco_output_dir_generator_expression(${target} DIR_GENERATOR)
 	add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
@@ -802,6 +801,7 @@ function(POCO_ADD_SINGLE_LIBRARY_BUNDLE target bundle_id)
     set(oneValueArgs 
     	ACTIVATOR_CLASS 
     	VERSION
+    	NAME
     	FOLDER
     )
     cmake_parse_arguments(args "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
@@ -826,7 +826,13 @@ function(POCO_ADD_SINGLE_LIBRARY_BUNDLE target bundle_id)
 	endif()
 	set(POCO_BUNDLE_SYMBOLIC_NAME ${bundle_id})
 	set(POCO_BUNDLE_ROOT ${CMAKE_CURRENT_BINARY_DIR}/${bundle_id}.dir/root)
-	poco_add_bundle(${bundle_id} ACTIVATOR_LIBRARY ${target} ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS} FILES ${args_BUNDLE_FILES})
+	poco_add_bundle(${bundle_id} 
+		ACTIVATOR_LIBRARY ${target} 
+		ACTIVATOR_CLASS ${args_ACTIVATOR_CLASS} 
+		FILES ${args_BUNDLE_FILES} 
+		NAME ${args_NAME} 
+		${args_UNPARSED_ARGUMENTS}
+	)
 	if(args_FOLDER)
 		set_property(GLOBAL PROPERTY USE_FOLDERS true)
 		set_target_properties(${bundle_id} ${target}
