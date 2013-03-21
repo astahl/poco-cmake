@@ -47,26 +47,29 @@
 #
 # Author: Andreas Stahl andreas.stahl@tu-dresden.de
 
+set(Poco_HINTS
+	/usr/local
+	C:/AppliedInformatics
+	${Poco_DIR} 
+	$ENV{Poco_DIR}
+	$ENV{POCO_DIR}
+	$ENV{POCODIR}
+	$ENV{POCO_BASE}
+)
+
 if(NOT Poco_ROOT_DIR)
 	# look for the root directory, first for the source-tree variant
 	find_path(Poco_ROOT_DIR 
 		NAMES Foundation/include/Poco/Poco.h
-		HINTS
-			${Poco_DIR} 
-			$ENV{Poco_DIR}
-			$ENV{POCO_DIR}
-			$ENV{POCODIR}
+		HINTS ${Poco_HINTS}
+			
 	)
 	if(NOT Poco_ROOT_DIR)
 		# this means poco may have a different directory structure, maybe it was installed, let's check for that
 		message(STATUS "Looking for Poco install directory structure.")
 		find_path(Poco_ROOT_DIR 
 			NAMES include/Poco/Poco.h
-			HINTS 
-				${Poco_DIR} 
-				$ENV{Poco_DIR}
-				$ENV{POCO_DIR}
-				$ENV{POCODIR}
+			HINTS ${Poco_HINTS}
 		)
 		if(NOT Poco_ROOT_DIR) 
 			# poco was still not found -> Fail
@@ -81,24 +84,6 @@ if(NOT Poco_ROOT_DIR)
 	endif()
 endif()
 
-#find_library(_PocoFoundation_LIB 
-#	NAMES PocoFoundation PocoFoundationd
-#	HINTS ${Poco_ROOT_DIR}
-#	PATH_SUFFIXES
-#		lib
-#		lib/Darwin/i386
-#		lib/Darwin/x86_64
-#		bin
-#)
-#
-#get_filename_component(Poco_LIBRARY_DIR ${_PocoFoundation_LIB} PATH)
-#if(NOT Poco_LIBRARY_DIR AND Poco_FIND_REQUIRED)
-#	if(NOT Poco_FIND_QUIETLY)
-#		message(FATAL_ERROR "Could not find Poco library directory")
-#	endif()
-#	return()
-#endif()
-
 # add dynamic library directory
 if(WIN32)
 	find_path(Poco_RUNTIME_LIBRARY_DIRS
@@ -106,6 +91,7 @@ if(WIN32)
 		HINTS ${Poco_ROOT_DIR}
 		PATH_SUFFIXES 
 			bin
+			lib
 	)
 endif()
 
@@ -132,10 +118,8 @@ foreach( component ${components} )
 			NAMES 
 				Poco/${component}.h 	# e.g. Foundation.h
 				Poco/${component}/${component}.h # e.g. OSP/OSP.h Util/Util.h
-				#${component}.h
 			HINTS
 				${Poco_ROOT_DIR}
-				/usr/local # does not workFIXME
 			PATH_SUFFIXES
 				include
 				${component}/include
@@ -190,28 +174,33 @@ foreach( component ${components} )
 		set(Poco_${component}_FOUND TRUE)
 	elseif(NOT Poco_FIND_QUIETLY)
 		message(FATAL_ERROR "Could not find Poco component ${component}!")
-		return()
 	endif()
-	#endif(NOT Poco_${component}_FOUND)
 endforeach()
 
-#if(DEFINED Poco_LIBRARIES AND DEFINED Poco_DEBUG_LIBRARIES)
 if(DEFINED Poco_LIBRARIES)
 	set(Poco_FOUND true)
 endif()
 
-# find the osp bundle program
-find_program(
-	Poco_OSP_Bundle_EXECUTABLE 
-	NAMES bundle
-	HINTS 
-		${Poco_RUNTIME_LIBRARY_DIRS}
-		${Poco_ROOT_DIR}/bin/
-		${Poco_ROOT_DIR}/OSP/BundleCreator/bin/Darwin/x86_64
-		${Poco_ROOT_DIR}/OSP/BundleCreator/bin/Darwin/i386
-		/usr/local/bin
-	DOC "The executable that bundles OSP packages according to a .bndlspec specification."
-)
+if(${Poco_OSP_FOUND})
+	# find the osp bundle program
+	find_program(
+		Poco_OSP_Bundle_EXECUTABLE 
+		NAMES bundle
+		HINTS 
+			${Poco_RUNTIME_LIBRARY_DIRS}
+			${Poco_ROOT_DIR}
+		PATH_SUFFIXES
+			bin
+			OSP/BundleCreator/bin/Darwin/x86_64
+			OSP/BundleCreator/bin/Darwin/i386
+		DOC "The executable that bundles OSP packages according to a .bndlspec specification."
+	)
+	# include bundle script file
+	find_file(Poco_OSP_Bundles_file NAMES PocoBundles.cmake HINTS ${CMAKE_MODULE_PATH})
+	if(${Poco_OSP_Bundles_file})
+		include(${Poco_OSP_Bundles_file})
+	endif()
+endif()
 
 message(STATUS "Found Poco: ${Poco_LIBRARIES}")
 

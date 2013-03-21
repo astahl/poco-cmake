@@ -420,6 +420,7 @@ function(POCO_ADD_BUNDLE_DEPENDENCY target dependency)
 endfunction()
 
 function(POCO_TARGET_LINK_BUNDLE_LIBRARIES target)
+	poco_is_bundle(is_bundle ${target})
 	foreach(bundle ${ARGN})
 		poco_assert_bundle(${bundle})
 		get_target_property(libs ${bundle} POCO_BUNDLE_LIBRARIES)
@@ -430,11 +431,22 @@ function(POCO_TARGET_LINK_BUNDLE_LIBRARIES target)
 					if(type STREQUAL "MODULE_LIBRARY")
 						message(STATUS "Cannot link ${target} ${lib} ${type} -- skipping.")
 				   	else()
-						message(STATUS "Linking ${target} ${lib} ${type}")
-				   		target_link_libraries(${target} LINK_PUBLIC ${lib})
+				   		if(${is_bundle})
+				   			get_target_property(target_libs ${target} POCO_BUNDLE_LIBRARIES)
+				   			foreach(target_lib ${target_libs})
+				   				target_link_libraries(${target_lib} LINK_PUBLIC ${lib})
+								message(STATUS "Linking ${target_lib} ${lib} ${type}")
+							foreach()
+						else()
+				   			target_link_libraries(${target} LINK_PUBLIC ${lib})
+							message(STATUS "Linking ${target_lib} ${lib} ${type}")
+						endif()
 				   	endif()
 		    	endif()
 	    	endforeach()
+			if(${is_bundle})
+				poco_add_bundle_dependency(${target} ${bundle})
+			endif()
 	    else()
 	    	message("${bundle} has no libraries to link against.")
 	    endif()
@@ -661,9 +673,13 @@ function(POCO_FINALIZE_BUNDLE target)
 		poco_output_name_generator_expression(${target} NAME_GENERATOR)
 			
 		if(TARGET ${args_COPY_TO})
+			get_target_property(bundle_dir ${args_COPY_TO} POCO_MAIN_BUNDLE_DIRECTORY)
+			if(NOT ${bundle_dir})
+				set(bundle_dir bundles)
+			endif()
 			add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_copy.txt
-				COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${args_COPY_TO}>/bundles
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DIR_GENERATOR}/${NAME_GENERATOR} $<TARGET_FILE_DIR:${args_COPY_TO}>/bundles/
+				COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${args_COPY_TO}>/${bundle_dir}
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DIR_GENERATOR}/${NAME_GENERATOR} $<TARGET_FILE_DIR:${args_COPY_TO}>/${bundle_dir}/
 				COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
 				COMMENT "Copying Bundle ${target} to ${args_COPY_TO}'s bundle directory."
 				DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
