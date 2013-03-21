@@ -105,23 +105,23 @@ foreach(Config ${CMAKE_CONFIGURATION_TYPES})
 endforeach()
 
 
-macro(POCO_IS_BUNDLE var target)
+function(POCO_IS_BUNDLE var target)
 	if(TARGET ${target})
-		get_property(is_bundle TARGET ${target} PROPERTY POCO_BUNDLE SET)
-		set(${var} ${is_bundle})
+		get_property(_is_bundle TARGET ${target} PROPERTY POCO_BUNDLE SET)
+		set(${var} ${_is_bundle} PARENT_SCOPE)
 	else()
-		set(${var} FALSE)
+		set(${var} FALSE PARENT_SCOPE)
 	endif()
-endmacro()
+endfunction()
 
-macro(POCO_ASSERT_BUNDLE)
+function(POCO_ASSERT_BUNDLE)
 	foreach(arg ${ARGN})
-		poco_is_bundle(is_bundle ${arg})
-		if(NOT is_bundle)
+		poco_is_bundle(_is_bundle ${arg})
+		if(NOT _is_bundle)
 			message(FATAL_ERROR "Assertion failed: ${arg} is not a valid bundle target.")
 		endif()
 	endforeach()
-endmacro()
+endfunction()
 
 # sets a variable to a value depending on the evaluation of an if expression
 # similar to the tertiary assignment operator var = bool ? a : b
