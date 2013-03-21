@@ -758,6 +758,13 @@ function(POCO_ADD_BUNDLE target)
 		set(POCO_BUNDLE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/root")
 	endif()
 	
+	foreach(file ${args_FILES})
+		get_property(has_location SOURCE ${file} PROPERTY POCO_BUNDLE_LOCATION SET)	
+		if(NOT ${has_location})
+			set_source_files_properties(${file} PROPERTIES POCO_BUNDLE_LOCATION ".")
+		endif()
+	endforeach()
+
 	if(NOT POCO_BUNDLE_OUTPUT_DIRECTORY)
 		if(CMAKE_RUNTIME_OUTPUT_DIRECTORY)
 			set(POCO_BUNDLE_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bundles")
