@@ -210,11 +210,11 @@ function(POCO_INVOKE_BUNDLE_CREATOR)
 	endif()
 	if(NOT args_OSARCH AND NOT args_NO_OSARCH)
 		set(OSARCH "${CMAKE_SYSTEM_PROCESSOR}")
-		message("WARNING: OSARCH ${OSARCH} is probably invalid for Poco Bundles.")
+		message(WARNING "OSARCH ${OSARCH} is probably invalid for Poco Bundles.")
 	endif()
 	if(NOT args_OSNAME AND NOT args_NO_OSNAME)
 		set(OSNAME "${CMAKE_SYSTEM_NAME}")
-		message("WARNING: OSNAME ${OSNAME} is probably invalid for Poco Bundles.")
+		message(WARNING "OSNAME ${OSNAME} is probably invalid for Poco Bundles.")
 	endif()
 	if(UNIX)
 		set(opt --)
@@ -274,6 +274,9 @@ function(POCO_INSTALL_BUNDLE)
     cmake_parse_arguments(runtime "${subOptions}" "${subOneValueArgs}" "${subMultiValueArgs}" ${args_RUNTIME})
     cmake_parse_arguments(public_header "${subOptions}" "${subOneValueArgs}" "${subMultiValueArgs}" ${args_PUBLIC_HEADER})
     cmake_parse_arguments(debug_symbols "${subOptions}" "${subOneValueArgs}" "${subMultiValueArgs}" ${args_DEBUG_SYMBOLS})
+    if(NOT args_TARGETS)
+    	message(FATAL_ERROR "No targets defined for poco_install.")
+    endif()
     foreach(target ${args_TARGETS})
 		POCO_ASSERT_BUNDLE(${target})
 		poco_get_bundle_file_name(${target} bundle_file_name)
@@ -309,20 +312,22 @@ function(POCO_INSTALL_BUNDLE)
 					endif()
 				endif()
 			else()
-				set(install_args TARGETS ${lib} )
-				if(args_EXPORT)
-					list(APPEND install_args EXPORT ${args_EXPORT})
+				if(args_EXPORT OR args_LIBRARY OR args_ARCHIVE OR args_RUNTIME)
+					set(install_args TARGETS ${lib} )
+					if(args_EXPORT)
+						list(APPEND install_args EXPORT ${args_EXPORT})
+					endif()
+					if(args_LIBRARY)
+						list(APPEND install_args LIBRARY DESTINATION ${library_DESTINATION} CONFIGURATIONS ${library_CONFIGURATIONS})
+					endif()
+					if(args_ARCHIVE)
+			    		list(APPEND install_args ARCHIVE DESTINATION ${archive_DESTINATION} CONFIGURATIONS ${archive_CONFIGURATIONS})
+					endif()
+					if(args_RUNTIME)
+			    		list(APPEND install_args RUNTIME DESTINATION ${runtime_DESTINATION} CONFIGURATIONS ${runtime_CONFIGURATIONS})
+					endif()
+					install(${install_args})
 				endif()
-				if(args_LIBRARY)
-					list(APPEND install_args LIBRARY DESTINATION ${library_DESTINATION} CONFIGURATIONS ${library_CONFIGURATIONS})
-				endif()
-				if(args_ARCHIVE)
-		    		list(APPEND install_args ARCHIVE DESTINATION ${archive_DESTINATION} CONFIGURATIONS ${archive_CONFIGURATIONS})
-				endif()
-				if(args_RUNTIME)
-		    		list(APPEND install_args RUNTIME DESTINATION ${runtime_DESTINATION} CONFIGURATIONS ${runtime_CONFIGURATIONS})
-				endif()
-				install(${install_args})
 				# public headers
 				get_target_property(FILES ${lib} SOURCES)
 				foreach(file ${FILES})
@@ -427,14 +432,26 @@ function(POCO_TARGET_LINK_BUNDLE_LIBRARIES target)
 		set(libs ${target})
 	endif()
 	foreach(lib ${libs})
+		if(TARGET ${lib})
+		get_property(imported TARGET ${lib} PROPERTY IMPORTED)
+		if(NOT ${imported})
 		foreach(other_bundle ${ARGN})
 			poco_assert_bundle(${other_bundle})
 			get_target_property(other_libs ${other_bundle} POCO_BUNDLE_LIBRARIES)
-			target_link_libraries(${lib} LINK_PUBLIC ${other_libs})
+			foreach(other_lib ${other_libs})
+				if(TARGET ${other_lib})
+					get_target_property(type ${other_lib} TYPE)
+					if(NOT ${type} STREQUAL "MODULE_LIBRARY")
+						target_link_libraries(${lib} LINK_PUBLIC ${other_lib})
+					endif()
+				endif()
+			endforeach()
 			if(${is_bundle})
 				poco_add_bundle_dependency(${target} ${other_bundle})
 			endif()
 		endforeach()
+		endif()
+		endif()
 	endforeach()
 endfunction()
 
@@ -549,14 +566,7 @@ function(POCO_FINALIZE_BUNDLE target)
 		endif()
 	endforeach()
 	
-	add_custom_command(OUTPUT ${spec_output} ${mapping_file} ${bundle_root}
-		COMMAND ${CMAKE_COMMAND} ARGS 
-		-DCONFIGURATION:STRING=$<CONFIGURATION>
-		-DPOCO_BUNDLE_SPEC_OUTPUT:STRING="${spec_output}"
-		${config_arguments}
-		-P ${config_file}
-		DEPENDS ${libraries} ${config_file}
-	)
+	
 
 	# write needed properties to config
 	foreach(property 
@@ -604,7 +614,6 @@ function(POCO_FINALIZE_BUNDLE target)
 		if(${has_location})
 			get_source_file_property(location ${file} POCO_BUNDLE_LOCATION)
 			# the source file was assigned to be copied to a certain destination
-			message("${file} ${location}")
 			file(APPEND ${config_file} "poco_copy_files_to_bundle(${target} \"${file}\" \"${location}\")\n")
 		endif()
 	endforeach()
@@ -633,6 +642,15 @@ function(POCO_FINALIZE_BUNDLE target)
 	endif()
 	
 	file(APPEND ${config_file} "poco_configure_bundle_spec(${target} ${spec_input} ${spec_output})\n")
+
+	add_custom_command(OUTPUT ${spec_output} ${mapping_file} ${bundle_root}
+		COMMAND ${CMAKE_COMMAND} ARGS 
+		-DCONFIGURATION:STRING=$<CONFIGURATION>
+		-DPOCO_BUNDLE_SPEC_OUTPUT:STRING="${spec_output}"
+		${config_arguments}
+		-P ${config_file}
+		DEPENDS ${libraries} ${config_file} ${files}
+	)
 
 	IF_THEN_SET(WIN32 opt "/" "--")
 	if(args_KEEP_BUNDLE_DIR)
@@ -665,7 +683,7 @@ function(POCO_FINALIZE_BUNDLE target)
 			add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_copy.txt
 				COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${args_COPY_TO}>/${bundle_dir}
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DIR_GENERATOR}/${NAME_GENERATOR} $<TARGET_FILE_DIR:${args_COPY_TO}>/${bundle_dir}/
-				COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
+				COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_copy.txt
 				COMMENT "Copying Bundle ${target} to ${args_COPY_TO}'s bundle directory."
 				DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
 			)
@@ -673,7 +691,7 @@ function(POCO_FINALIZE_BUNDLE target)
 			add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_copy.txt
 				COMMAND ${CMAKE_COMMAND} -E make_directory ${args_COPY_TO}
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DIR_GENERATOR}/${NAME_GENERATOR} ${args_COPY_TO}/
-				COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
+				COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_copy.txt
 				COMMENT "Copying Bundle ${target} to directory ${args_COPY_TO}"
 				DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
 			)
