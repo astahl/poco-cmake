@@ -649,7 +649,7 @@ function(POCO_FINALIZE_BUNDLE target)
 		-DPOCO_BUNDLE_SPEC_OUTPUT:STRING="${spec_output}"
 		${config_arguments}
 		-P ${config_file}
-		DEPENDS ${libraries} ${config_file} ${files}
+		DEPENDS ${config_file}
 	)
 
 	IF_THEN_SET(WIN32 opt "/" "--")
