@@ -147,7 +147,7 @@ foreach( component ${components} )
 	endif()
 	if(Poco_${component}_LIBRARY)
 		list(APPEND Poco_LIBRARIES "optimized" ${Poco_${component}_LIBRARY} )
-		mark_as_advanced(${Poco_${component}_LIBRARY})
+		mark_as_advanced(Poco_${component}_LIBRARY)
 	endif()
 
 	# debug library
@@ -166,7 +166,7 @@ foreach( component ${components} )
 	endif(NOT Poco_${component}_LIBRARY_DEBUG)
 	if(Poco_${component}_LIBRARY_DEBUG)
 		list(APPEND Poco_LIBRARIES "debug" ${Poco_${component}_LIBRARY_DEBUG})
-		mark_as_advanced(${Poco_${component}_LIBRARY_DEBUG})
+		mark_as_advanced(Poco_${component}_LIBRARY_DEBUG)
 	endif()
 
 	# mark component as found or handle not finding it
@@ -195,6 +195,9 @@ if(${Poco_OSP_FOUND})
 			OSP/BundleCreator/bin/Darwin/i386
 		DOC "The executable that bundles OSP packages according to a .bndlspec specification."
 	)
+	if(Poco_OSP_Bundle_EXECUTABLE)
+		set(Poco_OSP_Bundle_EXECUTABLE_FOUND true)
+	endif()
 	# include bundle script file
 	find_file(Poco_OSP_Bundles_file NAMES PocoBundles.cmake HINTS ${CMAKE_MODULE_PATH})
 	if(${Poco_OSP_Bundles_file})
@@ -204,6 +207,4 @@ endif()
 
 message(STATUS "Found Poco: ${Poco_LIBRARIES}")
 
-if(Poco_OSP_Bundle_EXECUTABLE)
-	set(Poco_OSP_Bundle_EXECUTABLE_FOUND true)
-endif()
+
