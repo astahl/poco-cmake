@@ -613,6 +613,7 @@ function(POCO_FINALIZE_BUNDLE target)
 			
 		if(${has_location})
 			get_source_file_property(location ${file} POCO_BUNDLE_LOCATION)
+			list(APPEND files_in_bundle ${file})
 			# the source file was assigned to be copied to a certain destination
 			file(APPEND ${config_file} "poco_copy_files_to_bundle(${target} \"${file}\" \"${location}\")\n")
 		endif()
@@ -643,13 +644,14 @@ function(POCO_FINALIZE_BUNDLE target)
 	
 	file(APPEND ${config_file} "poco_configure_bundle_spec(${target} ${spec_input} ${spec_output})\n")
 
-	add_custom_command(OUTPUT ${spec_output} ${mapping_file} ${bundle_root}
+	add_custom_command(OUTPUT ${spec_output}
 		COMMAND ${CMAKE_COMMAND} ARGS 
 		-DCONFIGURATION:STRING=$<CONFIGURATION>
 		-DPOCO_BUNDLE_SPEC_OUTPUT:STRING="${spec_output}"
 		${config_arguments}
 		-P ${config_file}
-		DEPENDS ${config_file}
+		DEPENDS ${config_file} ${libraries} ${files_in_bundle}
+		COMMENT "Configuring Bundle ${target} from ${config_file}"
 	)
 
 	IF_THEN_SET(WIN32 opt "/" "--")
