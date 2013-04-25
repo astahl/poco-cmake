@@ -661,20 +661,19 @@ function(POCO_FINALIZE_BUNDLE target)
 	
 
 	poco_output_dir_generator_expression(${target} DIR_GENERATOR)
+	poco_output_name_generator_expression(${target} NAME_GENERATOR)
 	add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
 		COMMAND ${Poco_OSP_Bundle_EXECUTABLE} 
 		ARGS 
 			${opt}output-dir=${DIR_GENERATOR} 
 			${bundle_args} 
 			${spec_output}
-		COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
-		DEPENDS ${spec_output}
+		COMMAND ${CMAKE_COMMAND} -E echo "${DIR_GENERATOR}/${NAME_GENERATOR}" > ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
+		DEPENDS ${spec_output} ${libraries} ${files_in_bundle}
 		WORKING_DIRECTORY ${bundle_root}
 		COMMENT "Building Bundle ${target} in root ${bundle_root}"
 	)
-	if(args_COPY_TO)
-		poco_output_name_generator_expression(${target} NAME_GENERATOR)
-			
+	if(args_COPY_TO)	
 		if(TARGET ${args_COPY_TO})
 			get_target_property(bundle_dir ${args_COPY_TO} POCO_MAIN_BUNDLE_DIRECTORY)
 			if(NOT ${bundle_dir})
@@ -683,7 +682,7 @@ function(POCO_FINALIZE_BUNDLE target)
 			add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_copy.txt
 				COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${args_COPY_TO}>/${bundle_dir}
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DIR_GENERATOR}/${NAME_GENERATOR} $<TARGET_FILE_DIR:${args_COPY_TO}>/${bundle_dir}/
-				COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_copy.txt
+				COMMAND ${CMAKE_COMMAND} -E echo "$<TARGET_FILE_DIR:${args_COPY_TO}>/${bundle_dir}/${NAME_GENERATOR}" > ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_copy.txt
 				COMMENT "Copying Bundle ${target} to ${args_COPY_TO}'s bundle directory."
 				DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
 			)
@@ -691,7 +690,7 @@ function(POCO_FINALIZE_BUNDLE target)
 			add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_copy.txt
 				COMMAND ${CMAKE_COMMAND} -E make_directory ${args_COPY_TO}
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DIR_GENERATOR}/${NAME_GENERATOR} ${args_COPY_TO}/
-				COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_copy.txt
+				COMMAND ${CMAKE_COMMAND} -E echo "${args_COPY_TO}/${NAME_GENERATOR}" > ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_copy.txt
 				COMMENT "Copying Bundle ${target} to directory ${args_COPY_TO}"
 				DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}.dir/bundle_info.txt
 			)
