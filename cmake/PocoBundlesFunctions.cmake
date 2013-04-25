@@ -1,5 +1,5 @@
-set(POCO_VERBOSE 1)
-set(POCO_DEBUG 1)
+set(POCO_VERBOSE 0)
+set(POCO_DEBUG 0)
 
 macro(LOG_VERBOSE log_msg)
 	if(POCO_VERBOSE)
