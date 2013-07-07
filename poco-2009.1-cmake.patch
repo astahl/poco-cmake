@@ -303,7 +303,97 @@ diff -rupN poco-2009.1-tudresden/Foundation/CMakeLists.txt poco-2009.1-tudresden
 \ No newline at end of file
 diff -rupN poco-2009.1-tudresden/Foundation/src/NumberFormatter.cpp poco-2009.1-tudresden-cmake/Foundation/src/NumberFormatter.cpp
 --- poco-2009.1-tudresden/Foundation/src/NumberFormatter.cpp	2009-05-25 16:44:27.000000000 +0200
-+++ poco-2009.1-tudresden-cmake/Foundation/src/NumberFormatter.cpp	2013-04-11 11:52:31.000000000 +0200
++++ poco-2009.1-tudresden-cmake/Foundation/src/NumberFormatter.cpp	2013-07-07 13:42:46.000000000 +0200
+@@ -241,7 +241,7 @@ void NumberFormatter::appendHex(std::str
+ void NumberFormatter::append(std::string& str, Int64 value)
+ {
+ 	char buffer[64];
+-	std::sprintf(buffer, "%"I64_FMT"d", value);
++	std::sprintf(buffer, "%" I64_FMT"d", value);
+ 	str.append(buffer);
+ }
+ 
+@@ -251,7 +251,7 @@ void NumberFormatter::append(std::string
+ 	poco_assert (width > 0 && width < 64);
+ 
+ 	char buffer[64];
+-	std::sprintf(buffer, "%*"I64_FMT"d", width, value);
++	std::sprintf(buffer, "%*" I64_FMT"d", width, value);
+ 	str.append(buffer);
+ }
+ 
+@@ -261,7 +261,7 @@ void NumberFormatter::append0(std::strin
+ 	poco_assert (width > 0 && width < 64);
+ 
+ 	char buffer[64];
+-	std::sprintf(buffer, "%0*"I64_FMT"d", width, value);
++	std::sprintf(buffer, "%0*" I64_FMT"d", width, value);
+ 	str.append(buffer);
+ }
+ 
+@@ -269,7 +269,7 @@ void NumberFormatter::append0(std::strin
+ void NumberFormatter::appendHex(std::string& str, Int64 value)
+ {
+ 	char buffer[64];
+-	std::sprintf(buffer, "%"I64_FMT"X", value);
++	std::sprintf(buffer, "%" I64_FMT"X", value);
+ 	str.append(buffer);
+ }
+ 
+@@ -279,7 +279,7 @@ void NumberFormatter::appendHex(std::str
+ 	poco_assert (width > 0 && width < 64);
+ 
+ 	char buffer[64];
+-	std::sprintf(buffer, "%0*"I64_FMT"X", width, value);
++	std::sprintf(buffer, "%0*" I64_FMT"X", width, value);
+ 	str.append(buffer);
+ }
+ 
+@@ -287,7 +287,7 @@ void NumberFormatter::appendHex(std::str
+ void NumberFormatter::append(std::string& str, UInt64 value)
+ {
+ 	char buffer[64];
+-	std::sprintf(buffer, "%"I64_FMT"u", value);
++	std::sprintf(buffer, "%" I64_FMT"u", value);
+ 	str.append(buffer);
+ }
+ 
+@@ -297,7 +297,7 @@ void NumberFormatter::append(std::string
+ 	poco_assert (width > 0 && width < 64);
+ 
+ 	char buffer[64];
+-	std::sprintf(buffer, "%*"I64_FMT"u", width, value);
++	std::sprintf(buffer, "%*" I64_FMT"u", width, value);
+ 	str.append(buffer);
+ }
+ 
+@@ -307,7 +307,7 @@ void NumberFormatter::append0(std::strin
+ 	poco_assert (width > 0 && width < 64);
+ 
+ 	char buffer[64];
+-	std::sprintf(buffer, "%0*"I64_FMT"u", width, value);
++	std::sprintf(buffer, "%0*" I64_FMT"u", width, value);
+ 	str.append(buffer);
+ }
+ 
+@@ -315,7 +315,7 @@ void NumberFormatter::append0(std::strin
+ void NumberFormatter::appendHex(std::string& str, UInt64 value)
+ {
+ 	char buffer[64];
+-	std::sprintf(buffer, "%"I64_FMT"X", value);
++	std::sprintf(buffer, "%" I64_FMT"X", value);
+ 	str.append(buffer);
+ }
+ 
+@@ -325,7 +325,7 @@ void NumberFormatter::appendHex(std::str
+ 	poco_assert (width > 0 && width < 64);
+ 
+ 	char buffer[64];
+-	std::sprintf(buffer, "%0*"I64_FMT"X", width, value);
++	std::sprintf(buffer, "%0*" I64_FMT"X", width, value);
+ 	str.append(buffer);
+ }
+ 
 @@ -373,7 +373,7 @@ void NumberFormatter::append(std::string
  {
  	char buffer[24];
