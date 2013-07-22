@@ -607,18 +607,21 @@ function(POCO_FINALIZE_BUNDLE target)
 		endif()
     endforeach()
 
+    # mapping file
     file(APPEND ${config_file} "\nset(${bundle_key}_MAPPING_FILE \"${mapping_file}\")\n")
     set_target_properties(${target} PROPERTIES POCO_BUNDLE_MAPPING_FILE "${mapping_file}")
-
+    # dependent mapping files
     get_target_property(dependencies ${target} _POCO_BUNDLE_TARGET_DEPENDENCIES)
     if(dependencies)
     foreach(other_bundle ${dependencies})
 		get_target_property(other_mapping_file ${other_bundle} POCO_BUNDLE_MAPPING_FILE)
 		message(STATUS "${target} Mapping file for ${other_bundle}: ${other_mapping_file}")
-		file(APPEND ${config_file} "if(EXISTS ${other_mapping_file})\n")
-		file(APPEND ${config_file} "  include(${other_mapping_file})\n")
+		file(APPEND ${config_file} "if(EXISTS \"${other_mapping_file}\")\n")
+		file(APPEND ${config_file} "  include(\"${other_mapping_file}\")\n")
 		file(APPEND ${config_file} "endif()\n")
+		list(APPEND included_mappings "${other_mapping_file}")
 	endforeach()
+	file(APPEND ${config_file} "set(${bundle_key}_INCLUDED_MAPPINGS \"${included_mappings}\")\n")
 	endif()
 	# copy additional resources to bundle target
 	get_target_property(files ${target} SOURCES)
