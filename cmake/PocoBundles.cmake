@@ -530,7 +530,7 @@ endfunction()
 #  a poco bundle after target configuration
 function(POCO_FINALIZE_BUNDLE target)
 	set(options KEEP_BUNDLE_DIR NO_DEBUG_SYMBOLS)
-	set(multiValueArgs)
+	set(multiValueArgs IGNORE_LIBRARIES)
     set(oneValueArgs COPY_TO)
     cmake_parse_arguments(args "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
     
@@ -558,6 +558,7 @@ function(POCO_FINALIZE_BUNDLE target)
 			#"-D${library}_FILE_NAME=$<TARGET_FILE_NAME:${library}>"
 			#"-D${library}_LINKER_FILE=$<TARGET_LINKER_FILE:${library}>"
 		)
+		list(APPEND config_dir_args "$<TARGET_FILE_DIR:${library}>")
 		get_target_property(type ${library} TYPE)
 		if(type STREQUAL "SHARED_LIBRARY")
 			#list(APPEND config_arguments 
@@ -565,9 +566,7 @@ function(POCO_FINALIZE_BUNDLE target)
 			#)
 		endif()
 	endforeach()
-	
-	
-
+	list(APPEND config_arguments "-DLIB_DIRS=${config_dir_args}")
 	# write needed properties to config
 	foreach(property 
 		POCO_BUNDLE_SYMBOLIC_NAME
@@ -593,8 +592,24 @@ function(POCO_FINALIZE_BUNDLE target)
     	endif()
     endforeach()
 
+    ## declare ignored libraries (parameter IGNORE_LIBRARIES)
+    foreach(lib_name PocoFoundation PocoOSP PocoXML PocoUtil PocoZip)
+    	list(APPEND default_ignores ${CMAKE_SHARED_LIBRARY_PREFIX}${lib_name}${CMAKE_SHARED_LIBRARY_SUFFIX})
+    	list(APPEND default_ignores ${CMAKE_SHARED_LIBRARY_PREFIX}${lib_name}d${CMAKE_SHARED_LIBRARY_SUFFIX})
+    endforeach()
+    foreach(ignored_lib ${args_IGNORE_LIBRARIES} ${default_ignores})
+    	if(NOT TARGET)
+	    	string(TOUPPER ${ignored_lib} TEMP)
+	    	string(REPLACE "." "_" ignored_key ${TEMP})
+		    file(APPEND ${config_file} "set(${ignored_key}_IGNORE TRUE)\n")
+	    else()
+			list(APPEND config_arguments "-D$<TARGET_FILE_NAME:${ignored_lib}>_IGNORE:BOOL=TRUE")
+		endif()
+    endforeach()
+
     file(APPEND ${config_file} "\nset(${bundle_key}_MAPPING_FILE \"${mapping_file}\")\n")
     set_target_properties(${target} PROPERTIES POCO_BUNDLE_MAPPING_FILE "${mapping_file}")
+
     get_target_property(dependencies ${target} _POCO_BUNDLE_TARGET_DEPENDENCIES)
     if(dependencies)
     foreach(other_bundle ${dependencies})
