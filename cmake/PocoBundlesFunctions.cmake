@@ -1,4 +1,4 @@
-set(POCO_VERBOSE 1)
+#set(POCO_VERBOSE 1)
 #set(POCO_DEBUG 1)
 
 macro(LOG_DEBUG log_msg)
@@ -327,9 +327,10 @@ function(POCO_SET_ACTIVATOR bundle library)
 	log_debug("key: ${key}")
 	set(key ${${key}_MAPPING})
 	log_debug("key: ${key}")
-	string(REGEX REPLACE d*.dylib|d*.dll|d*.so "" activator "${${key}_DEST_FILE_NAME}")
+	set(full_filename ${${key}_DEST_FILE_NAME})
+	string(REGEX REPLACE "d?\\.(dll|so|dylib)$" "" activator "${full_filename}")
 	set(${BUNDLE}_POCO_BUNDLE_ACTIVATOR_LIBRARY ${activator} PARENT_SCOPE)
-	log_debug("Set ${BUNDLE}_POCO_BUNDLE_ACTIVATOR_LIBRARY: ${activator}")
+	log_debug("Set ${BUNDLE}_POCO_BUNDLE_ACTIVATOR_LIBRARY: ${activator} from ${${key}_DEST_FILE_NAME}")
 endfunction()
 
 function(POCO_COPY_FILES_TO_BUNDLE bundle file location_in_bundle)
