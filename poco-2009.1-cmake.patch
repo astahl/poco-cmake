@@ -22,7 +22,7 @@ diff -rupN poco-2009.1-tudresden/CMakeLists.txt poco-2009.1-tudresden-cmake/CMak
 +	set(CMAKE_INSTALL_NAME_DIR @executable_path/../Frameworks)
 +else()
 +	set(HEADER_INSTALL_DESTINATION include)
-+#	set(CMAKE_INSTALL_NAME_DIR @rpath)
++	set(CMAKE_INSTALL_NAME_DIR @rpath)
 +endif()
 +if(${USE_CXX11})
 +	if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" 
