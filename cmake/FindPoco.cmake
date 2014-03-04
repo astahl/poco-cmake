@@ -52,9 +52,6 @@ set(Poco_HINTS
 	C:/AppliedInformatics
 	${Poco_DIR} 
 	$ENV{Poco_DIR}
-	$ENV{POCO_DIR}
-	$ENV{POCODIR}
-	$ENV{POCO_BASE}
 )
 
 if(NOT Poco_ROOT_DIR)
@@ -62,7 +59,6 @@ if(NOT Poco_ROOT_DIR)
 	find_path(Poco_ROOT_DIR 
 		NAMES Foundation/include/Poco/Poco.h
 		HINTS ${Poco_HINTS}
-			
 	)
 	if(NOT Poco_ROOT_DIR)
 		# this means poco may have a different directory structure, maybe it was installed, let's check for that
@@ -73,9 +69,13 @@ if(NOT Poco_ROOT_DIR)
 		)
 		if(NOT Poco_ROOT_DIR) 
 			# poco was still not found -> Fail
-			if(NOT Poco_FIND_QUIETLY)
-				message(FATAL_ERROR "Could not find Poco install directory")
+			if(Poco_FIND_REQUIRED)
+				message(FATAL_ERROR "Poco: Could not find Poco install directory")
 			endif()
+			if(NOT Poco_FIND_QUIETLY)
+				message(STATUS "Poco: Could not find Poco install directory")
+			endif()
+			return()
 		else()
 			# poco was found with the make install directory structure
 			message(STATUS "Assuming Poco install directory structure at ${Poco_ROOT_DIR}.")
