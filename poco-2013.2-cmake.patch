@@ -1,8 +1,7 @@
-Binary files poco-2013.2-tudresden/.DS_Store and poco-2013.2-cmake/.DS_Store differ
 diff -rubN poco-2013.2-tudresden/CMakeLists.txt poco-2013.2-cmake/CMakeLists.txt
 --- poco-2013.2-tudresden/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/CMakeLists.txt	2014-03-04 17:28:49.000000000 +0100
-@@ -0,0 +1,173 @@
++++ poco-2013.2-cmake/CMakeLists.txt	2014-03-05 14:48:05.000000000 +0100
+@@ -0,0 +1,189 @@
 +project(POCO)
 +cmake_minimum_required(VERSION 2.8.12)
 +
@@ -10,10 +9,10 @@ diff -rubN poco-2013.2-tudresden/CMakeLists.txt poco-2013.2-cmake/CMakeLists.txt
 +	option(${name} "${description}" ${value})
 +	if(${name})
 +		add_definitions("-D${name}")
++		foreach(arg ${ARGN})
++			add_definitions("-D${arg}")
++		endforeach()
 +	endif()
-+	foreach(arg ${ARGN})
-+		add_definitions("-D${arg}")
-+	endforeach()
 +endmacro()
 +
 +option(POCO_NO_TESTS "Do not build testsuites." OFF)
@@ -88,17 +87,21 @@ diff -rubN poco-2013.2-tudresden/CMakeLists.txt poco-2013.2-cmake/CMakeLists.txt
 +
 +# Debug / Release related flags
 +set(CMAKE_DEBUG_POSTFIX "d")
-+set_directory_properties(PROPERTIES COMPILE_DEFINITIONS_DEBUG "_DEBUG=${DEBUGLEVEL}")
-+set_directory_properties(PROPERTIES COMPILE_DEFINITIONS_RELEASE "NDEBUG")
-+if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
-+	set_directory_properties(PROPERTIES COMPILE_DEFINITIONS "_DEBUG=${DEBUGLEVEL}")
-+else()
-+	set_directory_properties(PROPERTIES COMPILE_DEFINITIONS "NDEBUG")
++#if(NOT CMAKE_BUILD_TYPE)
++#	set_directory_properties(PROPERTIES COMPILE_DEFINITIONS_DEBUG "_DEBUG=${DEBUGLEVEL}")
++#	set_directory_properties(PROPERTIES COMPILE_DEFINITIONS_RELEASE "NDEBUG")
++#endif()
++if(NOT WIN32)
++	if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
++		add_definitions("-D_DEBUG=${DEBUGLEVEL}")
++	else()
++		add_definitions("-DNDEBUG")
++	endif()
 +endif()
 +
 +file(STRINGS libversion LIBVERSION)
 +set(POCO_OSP_VERSION 2)
-+add_definitions(-DPOCO_NO_TEMPLATE_ICOMPARE) #inhibits build error in NetSSL_OpenSSL referencing String.h in Foundations
++#add_definitions(-DPOCO_NO_TEMPLATE_ICOMPARE) #inhibits build error in NetSSL_OpenSSL referencing String.h in Foundations
 +
 +file(STRINGS components POCO_COMPONENTS)
 +
@@ -124,9 +127,11 @@ diff -rubN poco-2013.2-tudresden/CMakeLists.txt poco-2013.2-cmake/CMakeLists.txt
 +	PageCompiler
 +	PageCompiler/File2Page
 +)
-+if(UNIX AND NOT DARWIN)
-+	# on linuxes / bsds that are not os x, omit the Avahi library
++if(APPLE OR WIN32)
++	# on os x or windows, we use bonjour, so omit the Avahi library
 +	list(APPEND OMIT DNSSD/Avahi)
++else()
++	list(APPEND OMIT DNSSD/Bonjour)
 +endif()
 +
 +list(REMOVE_ITEM POCO_COMPONENTS ${OMIT})
@@ -146,25 +151,35 @@ diff -rubN poco-2013.2-tudresden/CMakeLists.txt poco-2013.2-cmake/CMakeLists.txt
 +function(poco_add_library target)
 +	add_library(${target} SHARED ${ARGN})
 +
++	string(REGEX REPLACE "^Poco" "" name ${target})
++
 +	set_target_properties(${target}
 +		PROPERTIES
 +		FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
 +		VERSION ${LIBVERSION}
++		DEFINE_SYMBOL ${name}_EXPORTS
 +	)
 +	target_include_directories(${target} 
 +		PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 +	 	$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include>
-+		PRIVATE src )
++		PRIVATE src 
++	)
 +endfunction()
 +
 +
 +function(poco_subproject target)
++	foreach(lib ${ARGN})
++		if(NOT TARGET ${lib})
++			message(WARNING "Skipping subproject ${target} because dependency ${lib} is invalid.")
++			return()
++		endif()
++	endforeach()
 +	file(GLOB_RECURSE INCLUDES "include/*.h")
 +	aux_source_directory(src SOURCES)
 +	
 +	poco_add_library(${target} ${SOURCES} ${INCLUDES})
 +	foreach(lib ${ARGN})
-+		target_link_libraries(${target} ${lib})
++		target_link_libraries(${target} PUBLIC ${lib})
 +	endforeach()
 +
 +	poco_install(${target})
@@ -178,7 +193,7 @@ diff -rubN poco-2013.2-tudresden/CMakeLists.txt poco-2013.2-cmake/CMakeLists.txt
 +
 diff -rubN poco-2013.2-tudresden/CppUnit/CMakeLists.txt poco-2013.2-cmake/CppUnit/CMakeLists.txt
 --- poco-2013.2-tudresden/CppUnit/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/CppUnit/CMakeLists.txt	2014-03-04 15:19:59.000000000 +0100
++++ poco-2013.2-cmake/CppUnit/CMakeLists.txt	2014-03-04 15:20:00.000000000 +0100
 @@ -0,0 +1,5 @@
 +poco_subproject(CppUnit)
 +
@@ -188,30 +203,11 @@ diff -rubN poco-2013.2-tudresden/CppUnit/CMakeLists.txt poco-2013.2-cmake/CppUni
 \ No newline at end of file
 diff -rubN poco-2013.2-tudresden/CppUnit/WinTestRunner/CMakeLists.txt poco-2013.2-cmake/CppUnit/WinTestRunner/CMakeLists.txt
 --- poco-2013.2-tudresden/CppUnit/WinTestRunner/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/CppUnit/WinTestRunner/CMakeLists.txt	2014-03-04 11:01:38.000000000 +0100
-@@ -0,0 +1,22 @@
-+aux_source_directory(src SOURCES)
-+file(GLOB_RECURSE INCLUDES include/*.h) 
-+
-+add_library(WinTestRunner SHARED ${SOURCES} ${INCLUDES} )
-+
-+set_target_properties(WinTestRunner
-+	PROPERTIES
-+	VERSION 1
-+)
-+
-+target_include_directories(WinTestRunner
-+	PRIVATE src
-+	PUBLIC include
-+)
-+
-+install(TARGETS WinTestRunner 
-+	FRAMEWORK DESTINATION frameworks
-+	RUNTIME DESTINATION bin
-+	LIBRARY DESTINATION lib
-+)
-+
-+install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
++++ poco-2013.2-cmake/CppUnit/WinTestRunner/CMakeLists.txt	2014-03-05 12:56:08.000000000 +0100
+@@ -0,0 +1,3 @@
++poco_subproject(WinTestRunner CppUnit)
++target_compile_definitions(WinTestRunner PRIVATE _AFXDLL)
++target_link_libraries(WinTestRunner PRIVATE winmm)
 \ No newline at end of file
 diff -rubN poco-2013.2-tudresden/Crypto/CMakeLists.txt poco-2013.2-cmake/Crypto/CMakeLists.txt
 --- poco-2013.2-tudresden/Crypto/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
@@ -226,7 +222,7 @@ diff -rubN poco-2013.2-tudresden/Crypto/CMakeLists.txt poco-2013.2-cmake/Crypto/
 \ No newline at end of file
 diff -rubN poco-2013.2-tudresden/DNSSD/Avahi/CMakeLists.txt poco-2013.2-cmake/DNSSD/Avahi/CMakeLists.txt
 --- poco-2013.2-tudresden/DNSSD/Avahi/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/DNSSD/Avahi/CMakeLists.txt	2014-03-04 15:24:07.000000000 +0100
++++ poco-2013.2-cmake/DNSSD/Avahi/CMakeLists.txt	2014-03-04 15:24:08.000000000 +0100
 @@ -0,0 +1,7 @@
 +find_package(Avahi)
 +if(NOT Avahi_FOUND)
@@ -238,9 +234,47 @@ diff -rubN poco-2013.2-tudresden/DNSSD/Avahi/CMakeLists.txt poco-2013.2-cmake/DN
 \ No newline at end of file
 diff -rubN poco-2013.2-tudresden/DNSSD/Bonjour/CMakeLists.txt poco-2013.2-cmake/DNSSD/Bonjour/CMakeLists.txt
 --- poco-2013.2-tudresden/DNSSD/Bonjour/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/DNSSD/Bonjour/CMakeLists.txt	2014-03-04 15:23:36.000000000 +0100
-@@ -0,0 +1 @@
-+poco_subproject(PocoDNSSDBonjour PocoFoundation PocoDNSSD)
++++ poco-2013.2-cmake/DNSSD/Bonjour/CMakeLists.txt	2014-03-05 14:51:25.000000000 +0100
+@@ -0,0 +1,39 @@
++if(NOT APPLE AND NOT WIN32)
++	return()
++endif()
++unset(Dependencies)
++if(WIN32)
++	set(Bonjour_PATH_HINTS
++		${Bonjour_DIR}
++		"C:/Program Files/Bonjour SDK"
++		"C:/Program Files (x86)/Bonjour SDK"
++	)
++	find_library(bonjour_lib dnssd
++		HINTS ${Bonjour_PATH_HINTS}
++		PATH_SUFFIXES 
++			#Lib/x64
++			Lib/Win32
++	)
++	find_file(bonjour_header dns_sd.h 
++		HINTS 
++			${Bonjour_PATH_HINTS}
++		PATH_SUFFIXES
++			Include
++	)
++	message("${bonjour_lib}")
++	if(NOT bonjour_lib)
++		message(WARNING "Could not find dnssd.lib, please provide a path to the Bonjour SDK installation in Bonjour_DIR variable.")
++		return()
++	endif()
++	get_filename_component(Bonjour_INCLUDE_DIR ${bonjour_header} DIRECTORY)
++	add_library(Bonjour IMPORTED SHARED)
++	set_target_properties(Bonjour PROPERTIES 
++		IMPORTED_IMPLIB ${bonjour_lib}
++		INTERFACE_INCLUDE_DIRECTORIES ${Bonjour_INCLUDE_DIR}
++	)
++	set(Dependencies Bonjour)
++endif()
++
++poco_subproject(PocoDNSSDBonjour PocoFoundation PocoDNSSD ${Dependencies})
++
++set_target_properties(PocoDNSSDBonjour PROPERTIES DEFINE_SYMBOL Bonjour_EXPORTS)
 \ No newline at end of file
 diff -rubN poco-2013.2-tudresden/DNSSD/CMakeLists.txt poco-2013.2-cmake/DNSSD/CMakeLists.txt
 --- poco-2013.2-tudresden/DNSSD/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
@@ -250,28 +284,31 @@ diff -rubN poco-2013.2-tudresden/DNSSD/CMakeLists.txt poco-2013.2-cmake/DNSSD/CM
 \ No newline at end of file
 diff -rubN poco-2013.2-tudresden/Data/CMakeLists.txt poco-2013.2-cmake/Data/CMakeLists.txt
 --- poco-2013.2-tudresden/Data/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/Data/CMakeLists.txt	2014-03-04 15:22:07.000000000 +0100
++++ poco-2013.2-cmake/Data/CMakeLists.txt	2014-03-04 15:22:08.000000000 +0100
 @@ -0,0 +1 @@
 +poco_subproject(PocoData PocoFoundation)
 \ No newline at end of file
 diff -rubN poco-2013.2-tudresden/Foundation/CMakeLists.txt poco-2013.2-cmake/Foundation/CMakeLists.txt
 --- poco-2013.2-tudresden/Foundation/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/Foundation/CMakeLists.txt	2014-03-04 16:03:39.000000000 +0100
-@@ -0,0 +1,71 @@
++++ poco-2013.2-cmake/Foundation/CMakeLists.txt	2014-03-05 12:27:06.000000000 +0100
+@@ -0,0 +1,79 @@
 +
 +
 +file(GLOB_RECURSE INCLUDES include/*.h)
 +
 +aux_source_directory(src SOURCES)
 +
-+if(NOT MINGW)
++if(MINGW OR WIN32)
 +	list(REMOVE_ITEM SOURCES
-+		src/WindowsConsoleChannel.cpp
-+		src/EventLogChannel.cpp
++		src/SyslogChannel.cpp
++	)
++	list(REMOVE_ITEM INCLUDES
++		include/SyslogChannel.h
 +	)
 +else()
 +	list(REMOVE_ITEM SOURCES
-+		src/SysLogChannel.cpp
++		src/WindowsConsoleChannel.cpp
++		src/EventLogChannel.cpp
 +	)
 +endif()
 +if(NOT VMS)
@@ -324,25 +361,32 @@ diff -rubN poco-2013.2-tudresden/Foundation/CMakeLists.txt poco-2013.2-cmake/Fou
 +
 +add_library(zlib STATIC ${ZLIB_SOURCES})
 +add_library(PCRE STATIC ${PCRE_SOURCES})
++target_compile_definitions(PCRE PUBLIC "PCRE_STATIC")
 +
 +poco_add_library(PocoFoundation ${SOURCES} ${INCLUDES})
 +target_link_libraries(PocoFoundation PRIVATE zlib PCRE)
++if(WIN32)
++	target_link_libraries(PocoFoundation PRIVATE iphlpapi)
++endif()
++
 +
 +poco_install(PocoFoundation)
 \ No newline at end of file
 diff -rubN poco-2013.2-tudresden/Net/CMakeLists.txt poco-2013.2-cmake/Net/CMakeLists.txt
 --- poco-2013.2-tudresden/Net/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/Net/CMakeLists.txt	2014-03-04 15:24:53.000000000 +0100
-@@ -0,0 +1,5 @@
++++ poco-2013.2-cmake/Net/CMakeLists.txt	2014-03-05 12:39:50.000000000 +0100
+@@ -0,0 +1,8 @@
 +poco_subproject(PocoNet PocoFoundation)
 +
-+set_target_properties(PocoNet PROPERTIES
-+	DEFINE_SYMBOL "Net_EXPORTS"
-+)
-\ No newline at end of file
++if(WIN32)
++	target_link_libraries(PocoNet PRIVATE 
++		ws2_32 #winsock2
++		iphlpapi
++	)
++endif()
 diff -rubN poco-2013.2-tudresden/NetSSL_OpenSSL/CMakeLists.txt poco-2013.2-cmake/NetSSL_OpenSSL/CMakeLists.txt
 --- poco-2013.2-tudresden/NetSSL_OpenSSL/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/NetSSL_OpenSSL/CMakeLists.txt	2014-03-04 15:25:45.000000000 +0100
++++ poco-2013.2-cmake/NetSSL_OpenSSL/CMakeLists.txt	2014-03-04 15:25:46.000000000 +0100
 @@ -0,0 +1,6 @@
 +find_package(OpenSSL)
 +if(NOT OpenSSL_FOUND)
@@ -353,7 +397,7 @@ diff -rubN poco-2013.2-tudresden/NetSSL_OpenSSL/CMakeLists.txt poco-2013.2-cmake
 \ No newline at end of file
 diff -rubN poco-2013.2-tudresden/OSP/BundleAdmin/CMakeLists.txt poco-2013.2-cmake/OSP/BundleAdmin/CMakeLists.txt
 --- poco-2013.2-tudresden/OSP/BundleAdmin/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/OSP/BundleAdmin/CMakeLists.txt	2014-03-04 10:49:51.000000000 +0100
++++ poco-2013.2-cmake/OSP/BundleAdmin/CMakeLists.txt	2014-03-04 10:49:52.000000000 +0100
 @@ -0,0 +1,21 @@
 +aux_source_directory(src SOURCES)
 +
@@ -379,7 +423,7 @@ diff -rubN poco-2013.2-tudresden/OSP/BundleAdmin/CMakeLists.txt poco-2013.2-cmak
 \ No newline at end of file
 diff -rubN poco-2013.2-tudresden/OSP/BundleCreator/CMakeLists.txt poco-2013.2-cmake/OSP/BundleCreator/CMakeLists.txt
 --- poco-2013.2-tudresden/OSP/BundleCreator/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/OSP/BundleCreator/CMakeLists.txt	2014-03-04 16:27:35.000000000 +0100
++++ poco-2013.2-cmake/OSP/BundleCreator/CMakeLists.txt	2014-03-04 16:27:36.000000000 +0100
 @@ -0,0 +1,10 @@
 +aux_source_directory(src SOURCES)
 +file(GLOB_RECURSE INCLUDES src/*.h) 
@@ -394,81 +438,21 @@ diff -rubN poco-2013.2-tudresden/OSP/BundleCreator/CMakeLists.txt poco-2013.2-cm
 \ No newline at end of file
 diff -rubN poco-2013.2-tudresden/OSP/BundleSign/CMakeLists.txt poco-2013.2-cmake/OSP/BundleSign/CMakeLists.txt
 --- poco-2013.2-tudresden/OSP/BundleSign/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/OSP/BundleSign/CMakeLists.txt	2014-03-04 09:34:51.000000000 +0100
-@@ -0,0 +1,29 @@
-+include_directories(include)
-+include_directories(src)
-+include_directories(${POCO_SOURCE_DIR}/OSP/include)
-+include_directories(${POCO_SOURCE_DIR}/Foundation/include)
-+include_directories(${POCO_SOURCE_DIR}/Util/include)
-+include_directories(${POCO_SOURCE_DIR}/Zip/include)
-+include_directories(${POCO_SOURCE_DIR}/XML/include)
-+include_directories(${POCO_SOURCE_DIR}/Crypto/include)
-+
-+aux_source_directory(src SOURCES)
-+file(GLOB_RECURSE INCLUDES include/*.h) 
-+
-+add_library(PocoOSPBundleSign SHARED ${SOURCES} ${INCLUDES})
-+
-+set_target_properties(PocoOSPBundleSign
-+	PROPERTIES
-+	FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
-+	VERSION ${POCO_OSP_VERSION}
-+)
-+
-+target_link_libraries(PocoOSPBundleSign PocoOSP PocoZip PocoCrypto PocoUtil PocoXML PocoFoundation)
-+
-+install(TARGETS PocoOSPBundleSign 
-+	FRAMEWORK DESTINATION frameworks
-+	RUNTIME DESTINATION bin
-+	LIBRARY DESTINATION lib
-+)
-+
-+install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
++++ poco-2013.2-cmake/OSP/BundleSign/CMakeLists.txt	2014-03-05 12:43:40.000000000 +0100
+@@ -0,0 +1 @@
++poco_subproject(PocoOSPBundleSign PocoOSP PocoZip PocoCrypto PocoUtil PocoXML PocoFoundation)
 \ No newline at end of file
 diff -rubN poco-2013.2-tudresden/OSP/CMakeLists.txt poco-2013.2-cmake/OSP/CMakeLists.txt
 --- poco-2013.2-tudresden/OSP/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/OSP/CMakeLists.txt	2014-03-04 15:26:17.000000000 +0100
++++ poco-2013.2-cmake/OSP/CMakeLists.txt	2014-03-04 15:26:18.000000000 +0100
 @@ -0,0 +1 @@
 +poco_subproject(PocoOSP PocoFoundation PocoUtil PocoZip PocoXML)
 \ No newline at end of file
 diff -rubN poco-2013.2-tudresden/OSP/Web/CMakeLists.txt poco-2013.2-cmake/OSP/Web/CMakeLists.txt
 --- poco-2013.2-tudresden/OSP/Web/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/OSP/Web/CMakeLists.txt	2014-03-04 10:43:09.000000000 +0100
-@@ -0,0 +1,40 @@
-+set(LIB_SOURCES
-+	src/MediaTypeMapper.cpp
-+	src/WebServerDispatcher.cpp 
-+	src/WebServerRequestHandlerFactory.cpp 
-+	src/WebServerExtensionPoint.cpp 
-+	src/WebSession.cpp 
-+	src/WebRequestHandlerFactory.cpp
-+    src/WebServerRequestHandler.cpp 
-+    src/WebSessionManager.cpp
-+)
-+
-+file(GLOB_RECURSE INCLUDES include/*.h) 
-+
-+add_library(PocoOSPWeb SHARED ${LIB_SOURCES} ${INCLUDES})
-+
-+set_target_properties(PocoOSPWeb
-+	PROPERTIES
-+	FRAMEWORK ${POCO_ENABLE_MACOSX_FRAMEWORKS}
-+	VERSION ${POCO_OSP_VERSION}
-+)
-+
-+target_link_libraries(PocoOSPWeb PocoFoundation PocoUtil PocoNet PocoXML PocoOSP)
-+target_include_directories(PocoOSPWeb 
-+	PRIVATE src
-+	PUBLIC include )
-+
-+install(TARGETS PocoOSPWeb 
-+	FRAMEWORK DESTINATION frameworks
-+	RUNTIME DESTINATION bin
-+	LIBRARY DESTINATION lib
-+)
-+
-+install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
++++ poco-2013.2-cmake/OSP/Web/CMakeLists.txt	2014-03-05 12:53:34.000000000 +0100
+@@ -0,0 +1,8 @@
++poco_subproject(PocoOSPWeb PocoFoundation PocoUtil PocoNet PocoXML PocoOSP)
 +
 +add_library(osp.web SHARED src/WebBundleActivator.cpp)
 +target_link_libraries(osp.web PocoOSPWeb PocoOSP PocoUtil PocoXML PocoFoundation)
@@ -510,7 +494,7 @@ diff -rubN poco-2013.2-tudresden/XML/CMakeLists.txt poco-2013.2-cmake/XML/CMakeL
 \ No newline at end of file
 diff -rubN poco-2013.2-tudresden/Zip/CMakeLists.txt poco-2013.2-cmake/Zip/CMakeLists.txt
 --- poco-2013.2-tudresden/Zip/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/Zip/CMakeLists.txt	2014-03-04 15:34:23.000000000 +0100
++++ poco-2013.2-cmake/Zip/CMakeLists.txt	2014-03-04 15:34:24.000000000 +0100
 @@ -0,0 +1 @@
 +poco_subproject(PocoZip PocoFoundation)
 \ No newline at end of file
