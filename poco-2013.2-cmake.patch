@@ -1,7 +1,7 @@
 diff -rubN poco-2013.2-tudresden/CMakeLists.txt poco-2013.2-cmake/CMakeLists.txt
 --- poco-2013.2-tudresden/CMakeLists.txt	1970-01-01 01:00:00.000000000 +0100
-+++ poco-2013.2-cmake/CMakeLists.txt	2014-03-05 14:48:05.000000000 +0100
-@@ -0,0 +1,189 @@
++++ poco-2013.2-cmake/CMakeLists.txt	2014-03-05 16:15:45.000000000 +0100
+@@ -0,0 +1,190 @@
 +project(POCO)
 +cmake_minimum_required(VERSION 2.8.12)
 +
@@ -144,6 +144,7 @@ diff -rubN poco-2013.2-tudresden/CMakeLists.txt poco-2013.2-cmake/CMakeLists.txt
 +		FRAMEWORK DESTINATION frameworks
 +		LIBRARY DESTINATION lib
 +		RUNTIME DESTINATION bin
++		ARCHIVE DESTINATION lib
 +	)
 +	install(DIRECTORY include/ DESTINATION ${HEADER_INSTALL_DESTINATION} FILES_MATCHING PATTERN "*.h")
 +endfunction()
