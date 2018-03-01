@@ -4,12 +4,13 @@
 #
 # Util (loaded by default)
 # Foundation (loaded by default)
+# JSON
 # XML
 # Zip
 # Crypto
 # Data
 # Net
-# NetSSL_OpenSSL
+# NetSSL
 # OSP
 #
 # Usage:
@@ -114,10 +115,19 @@ foreach( component ${components} )
 		
 	# include directory for the component
 	if(NOT Poco_${component}_INCLUDE_DIR)
+		if(component STREQUAL "NetSSL")
+			set(component_INCLUDE_NAMES
+				"Poco/Net/NetSSL.h"
+			)
+		else()
+			set(component_INCLUDE_NAMES
+				"Poco/${component}.h" # e.g. Foundation.h
+				"Poco/${component}/${component}.h" # e.g. OSP/OSP.h Util/Util.h
+			)
+		endif()
 		find_path(Poco_${component}_INCLUDE_DIR
 			NAMES 
-				Poco/${component}.h 	# e.g. Foundation.h
-				Poco/${component}/${component}.h # e.g. OSP/OSP.h Util/Util.h
+				${component_INCLUDE_NAMES}
 			HINTS
 				${Poco_ROOT_DIR}
 			PATH_SUFFIXES
